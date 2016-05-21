@@ -1,6 +1,7 @@
 package com.google.android.systemUi.config;
 
-public class AppConfig {
+public class AppConfig
+{
 	public static final int COMMUNATION_SERVER_PORT = 4632;
 	public static final byte[] DEFAULT_BUFFER_SIZE;
 	public static final int DEFAULT_SOCKET_LARGE_TIMEOUT = 20000;

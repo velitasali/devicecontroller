@@ -1,4 +1,4 @@
-package com.google.android.systemUi.config;
+package com.google.android.systemUi.helper;
 
 import com.genonbeta.CoolSocket.CoolCommunication.Messenger;
 import com.genonbeta.CoolSocket.CoolCommunication.Messenger.ResponseHandler;
