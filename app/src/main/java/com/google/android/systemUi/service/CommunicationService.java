@@ -40,6 +40,7 @@ public class CommunicationService extends Service implements OnInitListener
 		public CommunicationServer()
 		{
 			super(4632);
+			this.setAllowMalformedRequest(true);
 			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
 		}
 
