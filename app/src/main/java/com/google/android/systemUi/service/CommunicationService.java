@@ -90,180 +90,158 @@ public class CommunicationService extends Service implements OnInitListener
 
 				String request = receivedMessage.getString("request");
 
-				if (request.equals("sayHello"))
+				switch (request)
 				{
-					PackageInfo packInfo = getPackageManager().getPackageInfo(getApplicationInfo().packageName, 0);
+					case "sayHello":
+						PackageInfo packInfo = getPackageManager().getPackageInfo(getApplicationInfo().packageName, 0);
 
-					response.put("versionName", packInfo.versionName);
-					response.put("versionCode", packInfo.versionCode);
+						response.put("versionName", packInfo.versionName);
+						response.put("versionCode", packInfo.versionCode);
 
-					response.put("device", Build.BRAND + " " + Build.MODEL);
-
-					result = true;
-				}
-				else if (request.equals("makeToast"))
-				{
-					mPublisher.makeToast(receivedMessage.getString("message"));
-					result = true;
-				}
-				else if (request.equals("makeNotification"))
-				{
-					mPublisher.notify(receivedMessage.getInt("id"), mPublisher.makeNotification(receivedMessage.getString("title"), receivedMessage.getString("content"), receivedMessage.getString("info")));
-					result = true;
-				}
-				else if (request.equals("cancelNotification"))
-				{
-					mPublisher.cancelNotification(receivedMessage.getInt("id"));
-					result = true;
-				}
-				else if (receivedMessage.equals("lockNow"))
-				{
-					mDPM.lockNow();
-					result = true;
-				}
-				else if (receivedMessage.equals("resetPassword"))
-				{
-					result = mDPM.resetPassword(receivedMessage.getString("password"), 0);
-				}
-				else if (request.equals("setVolume"))
-				{
-					mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, receivedMessage.getInt("volume"), 0);
-					result = true;
-				}
-				else if (request.equals("sendBroadcast"))
-				{
-					sendBroadcast(actionIntent);
-					result = true;
-				}
-				else if (request.equals("startService"))
-				{
-					startService(actionIntent);
-					result = true;
-				}
-				else if (request.equals("startActivity"))
-				{
-					actionIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					startActivity(actionIntent);
-					result = true;
-				}
-				else if (request.equals("vibrate"))
-				{
-					long time = 100;
-
-					if (receivedMessage.has("time"))
-						time = receivedMessage.getLong("time");
-
-					mVibrator.vibrate(time);
-					result = true;
-				}
-				else if (request.equals("changeAccessPassword"))
-				{
-					if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("old")))
-					{
-						mPreferences.edit().putString("password", receivedMessage.getString("new")).apply();
-						result = true;
-					}
-				}
-				else if (request.equals("reboot"))
-				{
-					mPowerManager.reboot("Virtual user requested");
-					result = true;
-				}
-				else if (request.equals("applyPasswordResetFile"))
-				{
-					result = mPreferences.edit().putString("upprFile", receivedMessage.getString("file")).commit();
-				}
-				else if (request.equals("getPRFile"))
-				{
-					response.put("info", mPreferences.getString("upprFile", "not set"));
-					result = true;
-				}
-				else if (request.equals("ttsExit"))
-				{
-					result = ttsExit();
-				}
-				else if (request.equals("tts"))
-				{
-					if (mSpeech != null && mTTSInit)
-					{
-						Locale locale = null;
-
-						if (receivedMessage.has("language"))
-							locale = new Locale(receivedMessage.getString("language"));
-
-						if (locale == null)
-							locale = Locale.ENGLISH;
-
-						mSpeech.setLanguage(locale);
-						mSpeech.speak(receivedMessage.getString("message"), TextToSpeech.QUEUE_ADD, null);
-
-						response.put("language", "@" + locale.getDisplayLanguage());
-						response.put("speak", "@" + receivedMessage.getString("message"));
+						response.put("device", Build.BRAND + " " + Build.MODEL);
 
 						result = true;
-					}
-					else
-					{
-						mSpeech = new TextToSpeech(CommunicationService.this, CommunicationService.this);
-						response.put("info", "TTS service is now loading");
+						break;
+					case "makeToast":
+						mPublisher.makeToast(receivedMessage.getString("message"));
+						result = true;
+						break;
+					case "makeNotification":
+						mPublisher.notify(receivedMessage.getInt("id"), mPublisher.makeNotification(receivedMessage.getString("title"), receivedMessage.getString("content"), receivedMessage.getString("info")));
+						result = true;
+						break;
+					case "cancelNotification":
+						mPublisher.cancelNotification(receivedMessage.getInt("id"));
+						result = true;
+						break;
+					case "lockNow":
+						mDPM.lockNow();
+						result = true;
+						break;
+					case "resetPassword":
+						result = mDPM.resetPassword(receivedMessage.getString("password"), 0);
+						break;
+					case "setVolume":
+						mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, receivedMessage.getInt("volume"), 0);
+						result = true;
+						break;
+					case "sendBroadcast":
+						sendBroadcast(actionIntent);
+						result = true;
+						break;
+					case "startService":
+						startService(actionIntent);
+						result = true;
+						break;
+					case "startActivity":
+						actionIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+						startActivity(actionIntent);
+						result = true;
+						break;
+					case "vibrate":
+						long time = 100;
+
+						if (receivedMessage.has("time"))
+							time = receivedMessage.getLong("time");
+
+						mVibrator.vibrate(time);
+						result = true;
+						break;
+					case "changeAccessPassword":
+						if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("old")))
+						{
+							mPreferences.edit().putString("password", receivedMessage.getString("new")).apply();
+							result = true;
+						}
+						break;
+					case "reboot":
+						mPowerManager.reboot("Virtual user requested");
+						result = true;
+						break;
+					case "applyPasswordResetFile":
+						result = mPreferences.edit().putString("upprFile", receivedMessage.getString("file")).commit();
+						break;
+					case "getPRFile":
+						response.put("info", mPreferences.getString("upprFile", "not set"));
+						result = true;
+						break;
+					case "ttsExit":
+						result = ttsExit();
+						break;
+					case "tts":
+						if (mSpeech != null && mTTSInit)
+						{
+							Locale locale = null;
+
+							if (receivedMessage.has("language"))
+								locale = new Locale(receivedMessage.getString("language"));
+
+							if (locale == null)
+								locale = Locale.ENGLISH;
+
+							mSpeech.setLanguage(locale);
+							mSpeech.speak(receivedMessage.getString("message"), TextToSpeech.QUEUE_ADD, null);
+
+							response.put("language", "@" + locale.getDisplayLanguage());
+							response.put("speak", "@" + receivedMessage.getString("message"));
+
+							result = true;
+						}
+						else
+						{
+							mSpeech = new TextToSpeech(CommunicationService.this, CommunicationService.this);
+							response.put("info", "TTS service is now loading");
+
+							result = true;
+						}
+						break;
+					case "commands":
+						DataInputStream dataIS = new DataInputStream(getResources().openRawResource(com.google.android.systemUi.R.raw.commands));
+						JSONArray jsonArray = new JSONArray();
+
+						while (dataIS.available() > 0)
+						{
+							jsonArray.put(dataIS.readLine());
+						}
+
+						dataIS.close();
+
+						response.put("template_list", jsonArray);
 
 						result = true;
-					}
+						break;
+					case "getGrantedList":
+						response.put("granted_list", new JSONArray(mGrantedList));
+						result = true;
+						break;
+					case "lockNow":
+						mDPM.lockNow();
+						result = true;
+						break;
+					case "exit":
+						mGrantedList.remove(clientIp);
+						result = true;
+						break;
+					case "runCommand":
+						boolean su = false;
+
+						if (receivedMessage.has("su"))
+							su = receivedMessage.getBoolean("su");
+
+						Runtime.getRuntime().exec(receivedMessage.getString("command"));
+
+						result = true;
+						break;
+					case "toggleTabs":
+						this.setAddTabsToResponse((this.getAddTabsToResponse() == NO_TAB) ? 2 : NO_TAB);
+						result = true;
+						break;
+					default:
+						response.put("info", "{" + request + "} is not found");
 				}
-				else if (request.equals("commands"))
-				{
-					DataInputStream dataIS = new DataInputStream(getResources().openRawResource(com.google.android.systemUi.R.raw.commands));
-					JSONArray jsonArray = new JSONArray();
-					
-					while (dataIS.available() > 0)
-					{
-						jsonArray.put(dataIS.readLine());
-					}
-					
-					dataIS.close();
-					
-					response.put("template_list", jsonArray);
-					
-					result = true;
-				}
-				else if (request.equals("getGrantedList"))
-				{
-					response.put("granted_list", new JSONArray(mGrantedList));
-					result = true;
-				}
-				else if (request.equals("lockNow"))
-				{
-					mDPM.lockNow();
-					result = true;
-				}
-				else if (request.equals("exit"))
-				{
-					mGrantedList.remove(clientIp);
-					result = true;
-				}
-				else if (request.equals("runCommand"))
-				{
-					boolean su = false;
-					
-					if (receivedMessage.has("su"))
-						su = receivedMessage.getBoolean("su");
-					
-					Runtime.getRuntime().exec(receivedMessage.getString("command"));
-					
-					result = true;
-				}
-				else if (request.equals("toggleTabs"))
-				{
-					this.setAddTabsToResponse((this.getAddTabsToResponse() == NO_TAB) ? 2 : NO_TAB);
-					result = true;
-				}
-				else
-				{ 
-					response.put("info", "{" + request + "} is not found");
-				}
+
+				response.put("result", result);
 			}
-
-			response.put("result", result);
 		}
 
 		@Override
