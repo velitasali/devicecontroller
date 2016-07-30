@@ -25,15 +25,18 @@ public class NotificationPublisher
 		mManager.cancel(notificationId);
 	}
 
-	public Notification makeNotification(String title, String text, String info)
+	public Notification makeNotification(int iconRes, String title, String text, String info, String ticker)
 	{
 		Notification.Builder builder = new Notification.Builder(mContext);
 
 		builder.setContentTitle(title)
 			.setContentText(text)
 			.setContentInfo(info)
-			.setSmallIcon(android.R.drawable.stat_sys_warning);
+			.setSmallIcon(iconRes);
 
+		if (ticker != null)	
+			builder.setTicker(ticker);
+			
 		return builder.getNotification();
 	}
 

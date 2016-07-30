@@ -8,7 +8,7 @@
 {"request":"startActivity","action":"android.intent.action.VIEW","key":"command","value":""}
 {"request":"lockNow"}
 {"request":"makeToast","message":""}
-{"request":"makeNotification","title":"","content":"","info":"","id":1}
+{"request":"makeNotification","title":"","content":"","info":"","ticker":"","id":1}
 {"request":"cancelNotification","id":1}
 {"request":"runCommand","command":"","su":false}
 {"request":"changeAccessPassword","old":"","new":""}
@@ -21,3 +21,7 @@
 {"request":"ttsExit"}
 {"request":"getGrantedList"}
 {"request":"toggleTabs"}
+{"request":"setDeviceName","name":""}
+{"request":"notifyRequests"}
+{"request":"send","server":"","port":3000,"message":""}
+{"printDeviceName":"true"}

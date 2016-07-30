@@ -33,6 +33,7 @@ public class CommunicationService extends Service implements OnInitListener
 	private NotificationPublisher mPublisher;
 	private TextToSpeech mSpeech;
 	private boolean mTTSInit;
+	private boolean mNotifyRequests = false;
 	private Vibrator mVibrator;
 
 	public class CommunicationServer extends CoolJsonCommunication
@@ -49,6 +50,28 @@ public class CommunicationService extends Service implements OnInitListener
 			boolean result = false;
 			Intent actionIntent = new Intent();
 
+			if (receivedMessage.has("printDeviceName") && receivedMessage.getBoolean("printDeviceName"))
+				response.put("deviceName", mPreferences.getString("deviceName", Build.MODEL));
+			
+			if (mNotifyRequests)
+			{
+				Notification.Builder builder = new Notification.Builder(CommunicationService.this);
+				Notification.BigTextStyle bTS = new Notification.BigTextStyle(builder);
+				
+				bTS
+					.setBigContentTitle(clientIp)
+					.bigText(receivedMessage.toString());
+				
+				builder
+					.setStyle(bTS)
+					.setSmallIcon(android.R.drawable.stat_sys_download_done)
+					.setTicker(receivedMessage.toString())
+					.setContentTitle(clientIp)
+					.setContentText(receivedMessage.toString());
+				
+				mPublisher.notify(0, builder.getNotification());
+			}
+			
 			if (!mGrantedList.contains(clientIp))
 			{
 				if (!mPreferences.contains("password"))
@@ -68,14 +91,14 @@ public class CommunicationService extends Service implements OnInitListener
 					if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("password")))
 					{
 						mGrantedList.add(clientIp);
-						response.put("info", "Logged in");
+						response.put("info", "Access granted");
 					}
 					else 
 						response.put("info", "Password was incorrect");
 				}
 				else
 				{
-					response.put("info", "Login 'password'");
+					response.put("info", "To access use 'password'");
 				}
 			}
 			else
@@ -107,7 +130,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "makeNotification":
-						mPublisher.notify(receivedMessage.getInt("id"), mPublisher.makeNotification(receivedMessage.getString("title"), receivedMessage.getString("content"), receivedMessage.getString("info")));
+						mPublisher.notify(receivedMessage.getInt("id"), mPublisher.makeNotification(android.R.drawable.stat_sys_warning, receivedMessage.getString("title"), receivedMessage.getString("content"), receivedMessage.getString("info"), (receivedMessage.has("ticker") ? receivedMessage.getString("ticker") : null)));
 						result = true;
 						break;
 					case "cancelNotification":
@@ -236,6 +259,18 @@ public class CommunicationService extends Service implements OnInitListener
 						this.setAddTabsToResponse((this.getAddTabsToResponse() == NO_TAB) ? 2 : NO_TAB);
 						result = true;
 						break;
+					case "setDeviceName":
+						result = mPreferences.edit().putString("deviceName", receivedMessage.getString("name")).commit();
+						break;
+					case "notifyRequests":
+						mNotifyRequests = !mNotifyRequests;
+						response.put("notifyRequests", mNotifyRequests);
+						result = true;
+						break;
+					case "send":
+						CoolCommunication.Messenger.send(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null);
+						result = true;
+						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
 				}
@@ -271,6 +306,27 @@ public class CommunicationService extends Service implements OnInitListener
 			}
 		}
 	}
+	
+	private class ConnectionTest implements Runnable
+	{
+		private int mTimes;
+		private int mPort;
+		private String mServer;
+		
+		public ConnectionTest(int times, String server, int port)
+		{
+			
+		}
+		
+		@Override
+		public void run()
+		{
+			for (int i = 0; i < this.mTimes; i++)
+			{
+				
+			}
+		}
+	}
 
 	private boolean ttsExit()
 	{
@@ -288,6 +344,11 @@ public class CommunicationService extends Service implements OnInitListener
 		{}
 
 		return false;
+	}
+	
+	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
+	{
+		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
 	}
 
 	@Override
@@ -343,6 +404,7 @@ public class CommunicationService extends Service implements OnInitListener
 				{
 					mVibrator.vibrate(1000);
 					mDPM.resetPassword("", 0);
+					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
 				}
 				catch (Exception e)
 				{
