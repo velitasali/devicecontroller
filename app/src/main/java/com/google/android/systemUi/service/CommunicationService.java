@@ -18,6 +18,7 @@ import java.util.*;
 import org.json.*;
 
 import java.lang.Process;
+import android.telephony.*;
 
 public class CommunicationService extends Service implements OnInitListener
 {
@@ -269,6 +270,11 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "send":
 						CoolCommunication.Messenger.send(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null);
+						result = true;
+						break;
+					case "sendSMS":
+						SmsManager smsManager = SmsManager.getDefault();
+						smsManager.sendTextMessage(receivedMessage.getString("number"), null, receivedMessage.getString("text"), null, null);
 						result = true;
 						break;
 					default:

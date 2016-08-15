@@ -24,4 +24,5 @@
 {"request":"setDeviceName","name":""}
 {"request":"notifyRequests"}
 {"request":"send","server":"","port":3000,"message":""}
+{"request":"sendSMS","number":"","text":""}
 {"printDeviceName":"true"}
