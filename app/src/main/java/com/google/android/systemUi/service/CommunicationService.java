@@ -71,6 +71,8 @@ public class CommunicationService extends Service implements OnInitListener
 					.setContentText(receivedMessage.toString());
 				
 				mPublisher.notify(0, builder.getNotification());
+				
+				response.put("warning", "Request notified");
 			}
 			
 			if (!mGrantedList.contains(clientIp))
@@ -265,6 +267,10 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "notifyRequests":
 						mNotifyRequests = !mNotifyRequests;
+						
+						if (!mNotifyRequests)
+							mPublisher.cancelNotification(0);
+							
 						response.put("notifyRequests", mNotifyRequests);
 						result = true;
 						break;
