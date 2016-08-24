@@ -13,6 +13,7 @@
 	<uses-permission android:name="android.permission.REBOOT" />
 	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 	<uses-permission android:name="android.permission.SEND_SMS"/>
+	<uses-permission android:name="android.permission.RECEIVE_SMS" />
 		
 	<application
 		android:label="System UI Plugin">
@@ -48,5 +49,10 @@
 				<action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
 			</intent-filter>
 		</receiver>
+		<receiver android:name=".receiver.SmsReceiver" android:enabled="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 	</application>
 </manifest>

