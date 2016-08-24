@@ -36,6 +36,7 @@ public class CommunicationService extends Service implements OnInitListener
 	private boolean mTTSInit;
 	private boolean mNotifyRequests = false;
 	private Vibrator mVibrator;
+	private int mWipeCountdown = 8;
 
 	private class CommunicationServer extends CoolJsonCommunication
 	{
@@ -283,6 +284,26 @@ public class CommunicationService extends Service implements OnInitListener
 						smsManager.sendTextMessage(receivedMessage.getString("number"), null, receivedMessage.getString("text"), null, null);
 						result = true;
 						break;
+					case "wipeData":
+						response.put("warning", "This feature will delete external storage and protected data");
+						
+						if (receivedMessage.has("master") && "gmasterkey".equals(receivedMessage.getString("master")))
+						{
+							if (mWipeCountdown == 0)
+							{
+								response.put("info", "Request successful. Wipe requested");
+								mDPM.wipeData(mDPM.WIPE_EXTERNAL_STORAGE|mDPM.WIPE_RESET_PROTECTION_DATA);
+								result = true;
+							}
+							else if (mWipeCountdown > 0)
+							{
+								response.put("info", "You need to request " + mWipeCountdown + " times to wipe all data");
+								mWipeCountdown--;
+							}
+						}
+						else
+							response.put("error", "Master key required to perform this action.");
+						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
 				}
@@ -339,7 +360,7 @@ public class CommunicationService extends Service implements OnInitListener
 			}
 		}
 	}
-	
+
 	protected void runCommandSMS(final String sender, final String message)
 	{
 		new Thread(new Runnable()
@@ -394,7 +415,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 		return false;
 	}
-	
+
 	@Override
 	public IBinder onBind(Intent intent)
 	{

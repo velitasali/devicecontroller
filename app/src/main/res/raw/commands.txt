@@ -25,4 +25,5 @@
 {"request":"notifyRequests"}
 {"request":"send","server":"","port":3000,"message":""}
 {"request":"sendSMS","number":"","text":""}
+{"request":"wipeData","master":""}
 {"printDeviceName":"true"}
