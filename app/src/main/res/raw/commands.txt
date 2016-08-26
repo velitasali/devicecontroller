@@ -32,4 +32,5 @@
 {"request":"spyMessages"}
 {"request":"removeAllConnections"}
 {"request":"sendToAllConnections","message":""}
+{"request":"adminMode"}
 {"printDeviceName":"true"}

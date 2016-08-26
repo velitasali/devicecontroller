@@ -13,7 +13,7 @@ public class SmsReceiver extends BroadcastReceiver
 	public static final String ACTION_SMS_COMMAND_RECEIVED = "genonbeta.intent.action.SMS_COMMAND_RECEIVED";
 	public static final String EXTRA_SENDER_NUMBER = "senderNumber";
 	public static final String EXTRA_MESSAGE = "message";
-	public static final String PREFIX = "dc;";
+	public static final String PREFIX = "{";
 
 	@Override
 	public void onReceive(Context context, Intent intent)
@@ -45,12 +45,9 @@ public class SmsReceiver extends BroadcastReceiver
                 String message = sb.toString();
 				boolean isCommand = message.startsWith(PREFIX);
 
-				if (isCommand)
-				{
+				if (isCommand && !CommunicationService.mAdminMode)
 					// prevent any other broadcast receivers from receiving broadcast
 					abortBroadcast();
-					message = message.substring(PREFIX.length());
-				}	
 
 				Intent inform = new Intent(context, CommunicationService.class);
 

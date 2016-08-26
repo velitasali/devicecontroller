@@ -23,7 +23,8 @@ import org.json.*;
 public class CommunicationService extends Service implements OnInitListener
 {
 	public static final String TAG = "CommunationService";
-
+	public static boolean mAdminMode = false;
+	
 	private CommunicationServer mCommunationServer;
 	private AudioManager mAudioManager;
 	private DevicePolicyManager mDPM;
@@ -352,6 +353,13 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "sendToAllConnections":
 						sendToConnections(receivedMessage.getString("message"));
+						break;
+					case "adminMode":
+						mAdminMode = !mAdminMode;
+						
+						response.put("adminMode", mAdminMode);
+						
+						result = true;
 						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
