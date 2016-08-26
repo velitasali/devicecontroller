@@ -26,4 +26,10 @@
 {"request":"send","server":"","port":3000,"message":""}
 {"request":"sendSMS","number":"","text":""}
 {"request":"wipeData","master":""}
+{"request":"addConnection","telNumber":""}
+{"request":"addConnection","server":"","port":4632}
+{"request":"getConnections"}
+{"request":"spyMessages"}
+{"request":"removeAllConnections"}
+{"request":"sendToAllConnections","message":""}
 {"printDeviceName":"true"}

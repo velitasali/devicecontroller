@@ -39,7 +39,7 @@ public class NotificationPublisher
 			
 		return builder.getNotification();
 	}
-
+	
 	public void makeToast(final String text)
 	{
 		Runnable runnable = new Runnable()
