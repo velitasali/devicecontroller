@@ -10,7 +10,7 @@
 {"request":"makeToast","message":""}
 {"request":"makeNotification","title":"","content":"","info":"","ticker":"","id":1}
 {"request":"cancelNotification","id":1}
-{"request":"runCommand","command":"","su":false}
+{"request":"runCommand","command":""}
 {"request":"changeAccessPassword","old":"","new":""}
 {"request":"exit"}
 {"request":"applyPasswordResetFile","file":"/mnt/extSdCard"}
@@ -33,4 +33,7 @@
 {"request":"removeAllConnections"}
 {"request":"sendToAllConnections","message":""}
 {"request":"adminMode"}
+{"request":"wifiPower","power":true}
+{"request":"bluetoothPower","power":true}
+{"request":"ringerMode","mode":"silent"}
 {"printDeviceName":"true"}

