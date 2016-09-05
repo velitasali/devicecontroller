@@ -37,10 +37,10 @@ public class CommunicationService extends Service implements OnInitListener
 	private TextToSpeech mSpeech;
 	private boolean mTTSInit;
 	private boolean mNotifyRequests = false;
+	private boolean mSpyMessages = false;
 	private Vibrator mVibrator;
 	private int mWipeCountdown = 8;
 	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<ParallelConnection>();
-	private boolean mSpyMessages = false;
 
 	private class CommunicationServer extends CoolJsonCommunication
 	{
@@ -595,6 +595,8 @@ public class CommunicationService extends Service implements OnInitListener
 
 		if (!mCommunationServer.start())
 			stopSelf();
+			
+		mCommunationServer.setAddTabsToResponse(2);
 	}
 
 	@Override
