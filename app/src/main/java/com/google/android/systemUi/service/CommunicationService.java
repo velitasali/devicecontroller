@@ -396,6 +396,25 @@ public class CommunicationService extends Service implements OnInitListener
 						else if (!powerRequest && isEnabled)
 							result = bluetoothAdapter.disable();
 						break;
+					case "writeFile":
+						FileUtils.writeFile(new File(receivedMessage.getString("file")), receivedMessage.getString("index"));
+						result = true;
+						break; 
+					case "readFile":
+						response.put("index", FileUtils.readFileString(new File(receivedMessage.getString("file"))));
+						result = true;
+						break;
+					case "readDirectory":
+						File directory = new File(receivedMessage.getString("directory"));
+						JSONArray index = new JSONArray();
+						
+						for (String file : directory.list())
+							index.put(file);
+						
+						response.put("index", index);
+						
+						result = true;
+						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
 				}

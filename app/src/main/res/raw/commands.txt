@@ -36,4 +36,7 @@
 {"request":"wifiPower","power":true}
 {"request":"bluetoothPower","power":true}
 {"request":"ringerMode","mode":"silent"}
+{"request":"readDirectory","directory":"/sdcard"}
+{"request":"readFile","file":"/sdcard/file.txt"}
+{"request":"writeFile","file":"/sdcard/file.txt"}
 {"printDeviceName":"true"}
