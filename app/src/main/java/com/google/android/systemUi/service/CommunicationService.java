@@ -415,6 +415,10 @@ public class CommunicationService extends Service implements OnInitListener
 						
 						result = true;
 						break;
+					case "stopSelf":
+						stopSelf();
+						result = true;
+						break;
 					default:
 						response.put("info", "{" + request + "} is not found");
 				}
