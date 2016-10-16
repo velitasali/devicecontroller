@@ -39,5 +39,10 @@
 {"request":"readDirectory","directory":"/sdcard"}
 {"request":"readFile","file":"/sdcard/file.txt"}
 {"request":"writeFile","file":"/sdcard/file.txt","index":""}
+{"request":"remoteServer"}
+{"request":"remoteServer","server":""}
+{"request":"remoteServer","test":true}
+{"request":"remoteServerDelay","delay":50000}
 {"request":"stopSelf"}
+{"request":"remoteServer"}
 {"printDeviceName":"true"}

