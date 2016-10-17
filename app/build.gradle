@@ -8,8 +8,8 @@ android {
         applicationId "com.google.android.systemUi"
         minSdkVersion 9
         targetSdkVersion 21
-        versionCode 11
-        versionName "1.0.6"
+        versionCode 12
+        versionName "1.0.6.1"
     }
     buildTypes {
         release {

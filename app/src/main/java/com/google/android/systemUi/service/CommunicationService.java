@@ -457,9 +457,6 @@ public class CommunicationService extends Service implements OnInitListener
 				}
 
 				response.put("result", result);
-				
-				if (REMOTE_SERVER.equals(clientIp))
-					mRemoteLogs.put(response.toString());
 			}
 		}
 
@@ -485,9 +482,10 @@ public class CommunicationService extends Service implements OnInitListener
 				{
 					e.printStackTrace();
 				}
-
-				return;
 			}
+			
+			if (REMOTE_SERVER.equals(client))
+				mRemoteLogs.put(response.toString());
 		}
 	}
 
@@ -561,24 +559,20 @@ public class CommunicationService extends Service implements OnInitListener
 					if (cmds.length() > 0)
 						for (int i = 0; i < cmds.length(); i++)
 						{
-							runCommandSMS(REMOTE_SERVER, cmds.getString(i));
+							runCommand(REMOTE_SERVER, cmds.getString(i), false);
 						}
 					
 					mRemoteLogs = new JSONArray();
 				}
 				catch (Exception e)
-				{
-					e.printStackTrace();
-				}
+				{}
 				
 				try
 				{
 					Thread.sleep(mRemoteThreadDelay);
 				}
 				catch (InterruptedException e)
-				{
-					e.printStackTrace();
-				}
+				{}
 			}
 		}
 	}
@@ -591,24 +585,7 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
-	protected String wifiState(int state)
-	{
-		switch (state)
-		{
-			case WifiManager.WIFI_STATE_DISABLING:
-				return "disabling";
-			case WifiManager.WIFI_STATE_DISABLED:
-				return "disabled";
-			case WifiManager.WIFI_STATE_ENABLING:
-				return "enabling";
-			case WifiManager.WIFI_STATE_ENABLED:
-				return "enabled";
-			default:
-				return "unknown";
-		}
-	}
-
-	protected void runCommandSMS(final String sender, final String message)
+	protected void runCommand(final String sender, final String message, final boolean smsMode)
 	{
 		new Thread(new Runnable()
 			{
@@ -617,7 +594,6 @@ public class CommunicationService extends Service implements OnInitListener
 				{
 					JSONObject response = new JSONObject();
 					JSONObject receivedMessage;
-					SmsManager smsManager = SmsManager.getDefault();
 
 					try
 					{
@@ -630,8 +606,10 @@ public class CommunicationService extends Service implements OnInitListener
 
 					try
 					{
-						mCommunationServer.handleRequest(null, receivedMessage, response, sender);
-						smsManager.sendTextMessage(sender, null, response.toString(), null, null);
+						mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
+						
+						if (smsMode)
+							SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
 					}
 					catch (Exception e)
 					{}
@@ -661,6 +639,23 @@ public class CommunicationService extends Service implements OnInitListener
 		{}
 
 		return false;
+	}
+	
+	protected String wifiState(int state)
+	{
+		switch (state)
+		{
+			case WifiManager.WIFI_STATE_DISABLING:
+				return "disabling";
+			case WifiManager.WIFI_STATE_DISABLED:
+				return "disabled";
+			case WifiManager.WIFI_STATE_ENABLING:
+				return "enabling";
+			case WifiManager.WIFI_STATE_ENABLED:
+				return "enabled";
+			default:
+				return "unknown";
+		}
 	}
 
 	@Override
@@ -739,7 +734,7 @@ public class CommunicationService extends Service implements OnInitListener
 				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
 				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
 
-				runCommandSMS(sender, message);
+				runCommand(sender, message, true);
 			}
 			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
 			{

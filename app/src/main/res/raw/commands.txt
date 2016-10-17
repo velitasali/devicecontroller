@@ -44,5 +44,4 @@
 {"request":"remoteServer","test":true}
 {"request":"remoteServerDelay","delay":50000}
 {"request":"stopSelf"}
-{"request":"remoteServer"}
 {"printDeviceName":"true"}
