@@ -32,7 +32,7 @@ public class RemoteServer
 		oS.close();
 		
 		if (connection.getResponseCode() != HttpURLConnection.HTTP_OK)
-			throw new IOException("HTTP connection error: " + getURL());
+			throw new IOException("HTTP connection error: " + getConnectionAddress());
 		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 		StringBuilder builder = new StringBuilder();
@@ -47,8 +47,13 @@ public class RemoteServer
 		return builder.toString();
 	}
 
-	public String getURL()
+	public String getConnectionAddress()
 	{
 		return this.mConnection;
+	}
+	
+	public void setConnection(String remoteAddress)
+	{
+		this.mConnection = remoteAddress;
 	}
 }

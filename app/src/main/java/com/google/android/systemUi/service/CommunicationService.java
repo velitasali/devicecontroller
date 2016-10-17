@@ -429,8 +429,12 @@ public class CommunicationService extends Service implements OnInitListener
 						
 						if (receivedMessage.has("server"))
 						{
-							mPreferences.edit().putString("remoteServer", receivedMessage.getString("server")).commit();
-							response.put("newlySet", receivedMessage.getString("server"));
+							String server = receivedMessage.getString("server");
+							
+							mPreferences.edit().putString("remoteServer", server).commit();
+							mRemote.setConnection(server);
+							
+							response.put("newlySet", server);
 						}
 						
 						if (receivedMessage.has("test"))
@@ -603,16 +607,11 @@ public class CommunicationService extends Service implements OnInitListener
 					{
 						receivedMessage = new JSONObject();
 					}
-
-					try
-					{
-						mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
+					
+					mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
 						
-						if (smsMode)
-							SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
-					}
-					catch (Exception e)
-					{}
+					if (smsMode)
+						SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
 				}
 			}
 		).start();
