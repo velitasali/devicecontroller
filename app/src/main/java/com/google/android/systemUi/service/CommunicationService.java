@@ -5,10 +5,13 @@ import android.app.admin.*;
 import android.bluetooth.*;
 import android.content.*;
 import android.content.pm.*;
+import android.database.*;
 import android.media.*;
+import android.net.*;
 import android.net.wifi.*;
 import android.os.*;
 import android.preference.*;
+import android.provider.*;
 import android.speech.tts.*;
 import android.speech.tts.TextToSpeech.*;
 import android.telephony.*;
@@ -46,8 +49,10 @@ public class CommunicationService extends Service implements OnInitListener
 	private long mRemoteThreadDelay = 50000;
 	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<ParallelConnection>();
 	private RemoteServer mRemote;
+	private String mCurrentSong = "unknown";
 	private RemoteThread mRemoteThread = new RemoteThread();
 	private JSONArray mRemoteLogs = new JSONArray();
+	private MediaPlayer mPlayer = new MediaPlayer();
 	
 	private class CommunicationServer extends CoolJsonCommunication
 	{
@@ -389,6 +394,8 @@ public class CommunicationService extends Service implements OnInitListener
 						}
 						else 
 							response.put("error", "Mode could not be set. Mode values can only be vibrate|silent|normal");
+							
+							response.put("currentMode", ringerMode(mAudioManager.getRingerMode()));
 						break;
 					case "bluetoothPower":
 						BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -454,6 +461,56 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "stopSelf":
 						stopSelf();
+						result = true;
+						break;
+					case "playSong":
+						if (receivedMessage.has("findByName"))
+						{
+							Cursor cursor;
+							
+							if (receivedMessage.has("artist"))
+								cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ? AND " + MediaStore.Audio.Media.ARTIST + " LIKE ?", new String[]{"%" + receivedMessage.getString("findByName") + "%", "%" + receivedMessage.getString("artist") + "%"}, null, null);
+							else
+								cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ?", new String[]{"%" + receivedMessage.getString("findByName") + "%"}, null, null);
+							
+							if (cursor.moveToFirst())
+							{
+								int songId = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Media._ID));
+								
+								mCurrentSong = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) + " - " + cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
+								
+								mPlayer.reset();
+								mPlayer.setDataSource(getApplicationContext(), Uri.parse(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI.toString() + "/" + songId));
+								
+								mPlayer.prepare();
+								mPlayer.start();
+								
+								result = true;
+							}
+							else
+								response.put("error", "The song you requested not found");
+						}
+						else if (receivedMessage.has("kill"))
+						{
+							mPlayer.reset();
+							result = true;
+						}
+						break;
+					case "getStatus":
+						response.put("playingSong", mPlayer.isPlaying());
+						response.put("bluetoothPower", BluetoothAdapter.getDefaultAdapter().isEnabled());
+						response.put("wifiPower", wifiState(((WifiManager) getSystemService(WIFI_SERVICE)).getWifiState()));
+						response.put("remoteDelay", mRemoteThreadDelay);
+						response.put("ringerMode", ringerMode(mAudioManager.getRingerMode()));
+						response.put("streamVolume", mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
+						response.put("parallelConnections", mParallelConnections.size());
+						response.put("notifyRequest", mNotifyRequests);
+						response.put("adminMode", mAdminMode);
+						response.put("ttsInit", mTTSInit);
+						response.put("grantedList", mGrantedList);
+						response.put("remoteServer", mRemote.getConnectionAddress());
+						response.put("currentSong", mCurrentSong);
+						
 						result = true;
 						break;
 					default:
@@ -589,6 +646,21 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
+	protected String ringerMode(int mode)
+	{
+		switch(mode)
+		{
+			case mAudioManager.RINGER_MODE_NORMAL:
+				return "normal";
+			case mAudioManager.RINGER_MODE_SILENT:
+				return "silent";
+			case mAudioManager.RINGER_MODE_VIBRATE:
+				return "vibrate";
+			default:
+				return "unknown";
+		}
+	}
+	
 	protected void runCommand(final String sender, final String message, final boolean smsMode)
 	{
 		new Thread(new Runnable()
@@ -685,6 +757,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 		mRemoteThread.interrupt();
 		mCommunationServer.stop();
+		mPlayer.reset();
 		ttsExit();
 	}
 

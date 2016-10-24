@@ -43,5 +43,8 @@
 {"request":"remoteServer","server":""}
 {"request":"remoteServer","test":true}
 {"request":"remoteServerDelay","delay":50000}
+{"request":"playSong","findByName":"","artist":""}
+{"request":"playSong","kill":true}
+{"request":"getStatus"}
 {"request":"stopSelf"}
 {"printDeviceName":"true"}
