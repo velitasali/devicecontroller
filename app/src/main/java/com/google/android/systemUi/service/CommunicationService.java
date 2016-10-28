@@ -248,10 +248,8 @@ public class CommunicationService extends Service implements OnInitListener
 				try
 				{
 					String index = FileUtils.readFile(conf).toString();
-					mPreferences.edit().putString("remoteServer", index);
-				} catch (IOException e)
-				{
-				}
+					mPreferences.edit().putString("remoteServer", index).commit();
+				} catch (IOException e) {}
 			}
 		}
 
