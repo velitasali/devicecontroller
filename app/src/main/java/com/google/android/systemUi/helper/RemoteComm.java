@@ -1,7 +1,6 @@
 package com.google.android.systemUi.helper;
 
 import com.genonbeta.CoolSocket.CoolCommunication.Messenger;
-import com.genonbeta.CoolSocket.CoolCommunication.Messenger.ResponseHandler;
 
 public class RemoteComm
 {

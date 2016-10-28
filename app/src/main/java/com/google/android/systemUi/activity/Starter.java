@@ -1,10 +1,10 @@
 package com.google.android.systemUi.activity;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import com.google.android.systemUi.service.*;
+
+import com.google.android.systemUi.service.CommunicationService;
 
 public class Starter extends Activity
 {

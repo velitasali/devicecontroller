@@ -1,11 +1,12 @@
 package com.google.android.systemUi.receiver;
 
-import android.content.*;
-import android.os.*;
-import android.telephony.gsm.*;
-import android.util.*;
-import android.widget.*;
-import com.google.android.systemUi.service.*;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Bundle;
+import android.telephony.SmsMessage;
+
+import com.google.android.systemUi.service.CommunicationService;
 
 public class SmsReceiver extends BroadcastReceiver
 {

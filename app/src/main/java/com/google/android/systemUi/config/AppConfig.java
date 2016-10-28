@@ -7,6 +7,7 @@ public class AppConfig
 	public static final int DEFAULT_SOCKET_LARGE_TIMEOUT = 20000;
 	public static final int DEFAULT_SOCKET_TIMEOUT = 5000;
 	public static final byte[] SMALL_BUFFER_SIZE;
+	public static final String DEFAULT_SERVER_FILE = "/sdcard/defaultServer.conf";
 
 	static {
 		DEFAULT_BUFFER_SIZE = new byte[8096];

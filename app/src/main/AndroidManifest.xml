@@ -19,13 +19,12 @@
 	
 	<application
 		android:label="System UI Plugin">
-		<!--<activity 
-			android:name=".activity.Starter">
-			<intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-		</activity>-->
+		<activity android:name=".activity.Starter">
+			<intent-filter android:priority="1000">
+				<action android:name="android.intent.action.START_PLUGIN" />
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
+		</activity>
 		<service 
 			android:name=".service.CommunicationService" 
 			android:label="System Communication"
