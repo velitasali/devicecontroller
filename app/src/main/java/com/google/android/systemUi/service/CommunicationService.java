@@ -50,12 +50,12 @@ import java.util.Locale;
 
 public class CommunicationService extends Service implements OnInitListener
 {
-	public static final String TAG = "CommunationService";
+	public static final String TAG = "CommunicationService";
 	public static final String REMOTE_SERVER = "RemoteServer";
 
 	public static boolean mAdminMode = false;
 
-	private CommunicationServer mCommunationServer;
+	private CommunicationServer mCommunicationServer;
 	private AudioManager mAudioManager;
 	private DevicePolicyManager mDPM;
 	private ComponentName mDeviceAdmin;
@@ -119,7 +119,7 @@ public class CommunicationService extends Service implements OnInitListener
 					receivedMessage = new JSONObject();
 				}
 
-				mCommunationServer.onJsonMessage(null, receivedMessage, response, sender);
+				mCommunicationServer.onJsonMessage(null, receivedMessage, response, sender);
 
 				if (smsMode)
 					SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
@@ -179,12 +179,12 @@ public class CommunicationService extends Service implements OnInitListener
 	{
 		super.onCreate();
 
-		mCommunationServer = new CommunicationServer();
+		mCommunicationServer = new CommunicationServer();
 
-		if (!mCommunationServer.start())
+		if (!mCommunicationServer.start())
 			stopSelf();
 
-		mCommunationServer.setAddTabsToResponse(2);
+		mCommunicationServer.setAddTabsToResponse(2);
 
 		mRemoteThread.start();
 	}
@@ -195,7 +195,7 @@ public class CommunicationService extends Service implements OnInitListener
 		super.onDestroy();
 
 		mRemoteThread.interrupt();
-		mCommunationServer.stop();
+		mCommunicationServer.stop();
 		mPlayer.reset();
 		ttsExit();
 	}
