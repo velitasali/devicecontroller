@@ -1,0 +1,15 @@
+#Internal package file, do not edit.
+#Thu Dec 22 02:05:29 EET 2016
+1.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
+1.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/AndroidManifest.xml
+2.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
+3.set=ANDROID_RESOURCE
+2.set=ANDROID_RESOURCE
+2.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/raw/commands.txt
+count=4
+1.set=ANDROID_RESOURCE
+3.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
+0.set=ANDROID_RESOURCE
+0.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
+3.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/xml/device_admin.xml
+0.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/resources.arsc
