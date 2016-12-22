@@ -47,6 +47,13 @@
 {"request":"playSong","name":"","artist":""}
 {"request":"playSong","file":""}
 {"request":"playSong","kill":true}
+{"request":"voiceRecorder","event":"record"}
+{"request":"voiceRecorder","event":"stop"}
+{"request":"voiceRecorder","event":"path"}
+{"request":"uploadFile","file":"","delete":false}
+{"request":"uploadFolder","folder":"","delete":false}
+{"request":"uploadFolder","default":"recordings","delete":false}
+{"request":"downloadFile", "file":"/", "address":"http://"}
 {"request":"clipboard","text":""}
 {"request":"mediaButton","event":""}
 {"request":"getStatus"}
