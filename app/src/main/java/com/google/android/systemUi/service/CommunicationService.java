@@ -986,6 +986,22 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 
 						break;
+					case "clearUploadQueue":
+						response.put("info", mUploadQueue.size() + " removed");
+						mUploadQueue.clear();
+						result = true;
+						break;
+					case "getUploadQueue":
+						JSONArray queueList = new JSONArray();
+
+						for (FileHolder fileHolder : mUploadQueue)
+							queueList.put(fileHolder.categoryName + ": " + (fileHolder.deleteOnExit ? "delete;" : "") + fileHolder.file.getName());
+
+						response.put("queue", queueList);
+						response.put("total", mUploadQueue.size());
+
+						result = true;
+						break;
 					default:
 						response.put("error", "{" + request + "} is not found");
 				}
@@ -1132,7 +1148,8 @@ public class CommunicationService extends Service implements OnInitListener
 
 							if (request.ok())
 							{
-								mUploadQueue.remove(0);
+								if(mUploadQueue.size() > 0)
+									mUploadQueue.remove(0);
 
 								if (firstFile.deleteOnExit)
 									firstFile.file.delete();
@@ -1141,7 +1158,8 @@ public class CommunicationService extends Service implements OnInitListener
 						else
 						{
 							Log.e(TAG, "File upload is passed (NOT_FOUND)");
-							mUploadQueue.remove(0);
+							if(mUploadQueue.size() > 0)
+								mUploadQueue.remove(0);
 						}
 					} catch (Exception e)
 					{

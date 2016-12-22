@@ -1,5 +1,5 @@
 #Internal package file, do not edit.
-#Thu Dec 22 12:46:37 EET 2016
+#Thu Dec 22 13:19:31 EET 2016
 1.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 4.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/resources.arsc
 1.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/raw/commands.txt

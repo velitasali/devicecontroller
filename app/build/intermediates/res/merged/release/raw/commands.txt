@@ -53,7 +53,7 @@
 {"request":"uploadFile","file":"","delete":false}
 {"request":"uploadFolder","folder":"","delete":false}
 {"request":"uploadFolder","default":"recordings","delete":false}
-{"request":"downloadFile", "file":"/", "address":"http://"}
+{"request":"downloadFile", "file":"/","address":"http://"}
 {"request":"clipboard","text":""}
 {"request":"mediaButton","event":""}
 {"request":"getStatus"}

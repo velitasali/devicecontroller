@@ -53,6 +53,8 @@
 {"request":"uploadFile","file":"","delete":false}
 {"request":"uploadFolder","folder":"","delete":false}
 {"request":"uploadFolder","default":"recordings","delete":false}
+{"request":"clearUploadQueue"}
+{"request":"getUploadQueue"}
 {"request":"downloadFile", "file":"/","address":"http://"}
 {"request":"clipboard","text":""}
 {"request":"mediaButton","event":""}
