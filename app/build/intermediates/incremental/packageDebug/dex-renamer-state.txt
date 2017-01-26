@@ -1,4 +1,7 @@
-#Thu Dec 22 13:54:02 EET 2016
-base.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/1f/main
+#Thu Jan 26 23:30:17 EET 2017
+base.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/10/instant-run-bootstrap_107d961f4811b635b6ffcd1126ebb904a4ac9155
+renamed.1=classes2.dex
 renamed.0=classes.dex
-file.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/1f/main/classes.dex
+file.1=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/10/instant-run_e53abece4304465e4bb521092a81a9f38d1bf660/classes.dex
+base.1=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/10/instant-run_e53abece4304465e4bb521092a81a9f38d1bf660
+file.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/10/instant-run-bootstrap_107d961f4811b635b6ffcd1126ebb904a4ac9155/classes.dex

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">System User Interface Plugin</string>
+    <string name="app_name">SystemUI Plugin</string>
     <string name="device_admin_description">Enabling this enables extra features of System UI Plugin</string>
 </resources>

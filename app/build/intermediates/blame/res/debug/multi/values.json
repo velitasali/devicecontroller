@@ -7,8 +7,8 @@
                     "startLine": 2,
                     "startColumn": 4,
                     "startOffset": 55,
-                    "endColumn": 65,
-                    "endOffset": 116
+                    "endColumn": 52,
+                    "endOffset": 103
                 },
                 "from": {
                     "file": "/home/veli/Projects/DeviceController/app/src/main/res/values/strings.xml",
@@ -16,8 +16,8 @@
                         "startLine": 2,
                         "startColumn": 1,
                         "startOffset": 52,
-                        "endColumn": 62,
-                        "endOffset": 113
+                        "endColumn": 49,
+                        "endOffset": 100
                     }
                 }
             },
@@ -25,18 +25,18 @@
                 "to": {
                     "startLine": 3,
                     "startColumn": 4,
-                    "startOffset": 121,
+                    "startOffset": 108,
                     "endColumn": 109,
-                    "endOffset": 226
+                    "endOffset": 213
                 },
                 "from": {
                     "file": "/home/veli/Projects/DeviceController/app/src/main/res/values/strings.xml",
                     "position": {
                         "startLine": 3,
                         "startColumn": 1,
-                        "startOffset": 115,
+                        "startOffset": 102,
                         "endColumn": 106,
-                        "endOffset": 220
+                        "endOffset": 207
                     }
                 }
             }

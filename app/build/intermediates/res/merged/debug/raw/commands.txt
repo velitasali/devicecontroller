@@ -1,4 +1,6 @@
 {"password":""}
+{"silence":true}
+{"request":"configure"}
 {"request":"commands"}
 {"request":"setVolume","volume":10}
 {"request":"sayHello"}
