@@ -7,9 +7,9 @@ android {
     defaultConfig {
         applicationId "com.google.android.systemUi"
         minSdkVersion 16
-        targetSdkVersion 25
-        versionCode 17
-        versionName "1.1.1"
+        targetSdkVersion 22
+        versionCode 18
+        versionName "1.1.2"
     }
     buildTypes {
         release {

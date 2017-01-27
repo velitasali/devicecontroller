@@ -1,4 +1,4 @@
-#Fri Jan 27 11:09:39 EET 2017
+#Fri Jan 27 22:55:40 EET 2017
 base.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/debug/folders/1000/10/instant-run-bootstrap_107d961f4811b635b6ffcd1126ebb904a4ac9155
 renamed.1=classes2.dex
 renamed.0=classes.dex

@@ -29,7 +29,7 @@ public class Configuration extends Activity
 {
 	public static final String EXTRA_PASSWORD = "extraPassword";
 
-	private static final int REQUEST_READ_CONTACTS = 0;
+	private static final int REQUEST_PERMISSIONS = 0;
 
 	private SharedPreferences mPreferences;
 	private PreferencesFragment mFragment;
@@ -62,6 +62,10 @@ public class Configuration extends Activity
 	public boolean onCreateOptionsMenu(Menu menu)
 	{
 		getMenuInflater().inflate(R.menu.configuration, menu);
+
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+			menu.findItem(R.id.requestPermissions).setVisible(false);
+
 		return super.onCreateOptionsMenu(menu);
 	}
 
@@ -95,7 +99,7 @@ public class Configuration extends Activity
 		}
 		else
 		{
-			requestPermissions(new String[]{SEND_SMS, READ_SMS, RECORD_AUDIO, RECEIVE_SMS, WRITE_EXTERNAL_STORAGE}, REQUEST_READ_CONTACTS);
+			requestPermissions(new String[]{SEND_SMS, READ_SMS, RECORD_AUDIO, RECEIVE_SMS, WRITE_EXTERNAL_STORAGE}, REQUEST_PERMISSIONS);
 		}
 	}
 

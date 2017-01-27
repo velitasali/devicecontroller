@@ -77,6 +77,20 @@ application
 ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:21:5-63:19
 	android:label
 		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:22:9-41
+activity#com.google.android.systemUi.activity.Starter
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:24:9-29:20
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:24:19-51
+intent-filter#android.intent.action.MAIN+android.intent.category.LAUNCHER
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:25:13-28:29
+action#android.intent.action.MAIN
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:26:17-68
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:26:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:27:17-76
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:27:27-74
 activity#com.google.android.systemUi.activity.Configuration
 ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:31:9-60
 	android:name
