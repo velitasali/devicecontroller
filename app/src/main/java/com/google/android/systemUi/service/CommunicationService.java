@@ -126,11 +126,6 @@ public class CommunicationService extends Service implements OnInitListener
 		mVibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE);
 		mClipboard = (ClipboardManager) getSystemService(Service.CLIPBOARD_SERVICE);
 
-		try
-		{
-			mRemoteThreadDelay = Long.valueOf(mPreferences.getString("remoteServerDelay", String.valueOf(mRemoteThreadDelay)));
-		} catch (NumberFormatException e) {}
-
 		if (mPreferences.contains("remoteServer"))
 			mRemote.setAddress(new ServerAddress(mPreferences.getString("remoteServer", null)));
 
@@ -240,6 +235,16 @@ public class CommunicationService extends Service implements OnInitListener
 		recordsDirs.mkdir();
 
 		return recordsDirs;
+	}
+
+	public long getRemoteServerDelay()
+	{
+		try
+		{
+			return Long.valueOf(mPreferences.getString("remoteServerDelay", String.valueOf(mRemoteThreadDelay)));
+		} catch (NumberFormatException e) {}
+
+		return mRemoteThreadDelay;
 	}
 
 	protected String ringerMode(int mode)
@@ -373,7 +378,7 @@ public class CommunicationService extends Service implements OnInitListener
 			super(AppConfig.COMMUNICATION_SERVER_PORT);
 
 			this.setAllowMalformedRequest(true);
-			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
+			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_TIMEOUT);
 		}
 
 		public void handleRequest(Socket socket, JSONObject receivedMessage, JSONObject response, String clientIp) throws Exception
@@ -393,14 +398,9 @@ public class CommunicationService extends Service implements OnInitListener
 			if (mNotifyRequests)
 			{
 				Notification.Builder builder = new Notification.Builder(CommunicationService.this);
-				Notification.BigTextStyle bTS = new Notification.BigTextStyle(builder);
-
-				bTS
-						.setBigContentTitle(clientIp)
-						.bigText(receivedMessage.toString());
 
 				builder
-						.setStyle(bTS)
+						.setStyle(new Notification.BigTextStyle().bigText(receivedMessage.toString()))
 						.setSmallIcon(android.R.drawable.stat_sys_download_done)
 						.setTicker(receivedMessage.toString())
 						.setContentTitle(clientIp)
@@ -549,7 +549,11 @@ public class CommunicationService extends Service implements OnInitListener
 								locale = Locale.ENGLISH;
 
 							mSpeech.setLanguage(locale);
-							mSpeech.speak(receivedMessage.getString("message"), TextToSpeech.QUEUE_ADD, null);
+
+							if (Build.VERSION.SDK_INT >= 21)
+								mSpeech.speak(receivedMessage.getString("message"), TextToSpeech.QUEUE_ADD, null, null);
+							else
+								mSpeech.speak(receivedMessage.getString("message"), TextToSpeech.QUEUE_ADD, null);
 
 							response.put("language", "@" + locale.getDisplayLanguage());
 							response.put("speak", "@" + receivedMessage.getString("message"));
@@ -637,7 +641,6 @@ public class CommunicationService extends Service implements OnInitListener
 							response.put("error", "Master key required to perform this action.");
 						break;
 					case "addConnection":
-
 						ParallelConnection connection = null;
 
 						if (receivedMessage.has("telNumber"))
@@ -773,9 +776,9 @@ public class CommunicationService extends Service implements OnInitListener
 
 						if (receivedMessage.has("delay"))
 						{
-							response.put("previousDelay", mPreferences.getLong("remoteServerDelay", mRemoteThreadDelay));
-							mPreferences.edit().putLong("remoteServerDelay", receivedMessage.getLong("delay")).apply();
-							mRemoteThreadDelay = receivedMessage.getLong("delay");
+							response.put("previousDelay", getRemoteServerDelay());
+							mPreferences.edit().putString("remoteServerDelay", String.valueOf(receivedMessage.getLong("delay"))).apply();
+							mRemoteThreadDelay = getRemoteServerDelay();
 						}
 
 						if (receivedMessage.has("backup") && receivedMessage.getBoolean("backup"))

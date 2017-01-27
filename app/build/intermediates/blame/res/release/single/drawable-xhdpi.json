@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "/home/veli/Projects/DeviceController/app/build/intermediates/res/merged/release/drawable-xhdpi/ic_refresh_white_24dp.png",
+        "source": "/home/veli/Projects/DeviceController/app/src/main/res/drawable-xhdpi/ic_refresh_white_24dp.png"
+    },
+    {
+        "merged": "/home/veli/Projects/DeviceController/app/build/intermediates/res/merged/release/drawable-xhdpi/ic_done_white_24dp.png",
+        "source": "/home/veli/Projects/DeviceController/app/src/main/res/drawable-xhdpi/ic_done_white_24dp.png"
+    }
+]

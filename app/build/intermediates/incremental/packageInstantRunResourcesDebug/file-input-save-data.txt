@@ -1,10 +1,10 @@
 #Internal package file, do not edit.
-#Thu Jan 26 23:09:19 EET 2017
+#Fri Jan 27 11:09:24 EET 2017
 2.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-5.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/menu/configuration.xml
+5.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
 5.set=ANDROID_RESOURCE
 3.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-6.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
+6.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/menu/configuration.xml
 2.set=ANDROID_RESOURCE
 4.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
 7.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/xml/device_admin.xml
@@ -17,10 +17,10 @@ count=8
 1.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/resources.arsc
 1.set=ANDROID_RESOURCE
 7.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-2.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/AndroidManifest.xml
+2.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/xml/preferences.xml
 6.set=ANDROID_RESOURCE
 0.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-3.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/xml/preferences.xml
+3.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/AndroidManifest.xml
 3.set=ANDROID_RESOURCE
 1.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
 4.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/raw/commands.txt

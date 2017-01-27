@@ -5,29 +5,29 @@
     density="hdpi"
     format="8"
     plugin-version="2.2.3"
-    timestamp="26636388629804"
+    timestamp="10556901451770"
     token="-4182055511939979354"
     verifier="FULL_BUILD_REQUESTED" >
 
     <task
         name="javac"
-        duration="0" />
+        duration="1067" />
     <task
         name="instant-run-dex"
         duration="0" />
     <task
         name="instant-run-transform"
-        duration="0" />
+        duration="564" />
     <task
         name="verifier"
-        duration="0" />
+        duration="21" />
 
     <artifact
         location="/home/veli/Projects/DeviceController/app/build/outputs/apk/app-debug.apk"
         type="MAIN" />
 
     <build
-        timestamp="26636388629804"
+        timestamp="10556901451770"
         verifier="FULL_BUILD_REQUESTED" >
         <artifact
             location="/home/veli/Projects/DeviceController/app/build/outputs/apk/app-debug.apk"
