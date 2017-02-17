@@ -1,5 +1,5 @@
 #Internal package file, do not edit.
-#Fri Jan 27 23:00:44 EET 2017
+#Sat Feb 04 21:33:49 EET 2017
 8.set=ANDROID_RESOURCE
 1.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 1.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-mdpi-v4/ic_refresh_white_24dp.png
@@ -11,10 +11,10 @@
 5.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-xxxhdpi-v4/ic_done_white_24dp.png
 7.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 7.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/raw/commands.txt
-11.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
+11.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-xhdpi-v4/ic_refresh_white_24dp.png
 11.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 9.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
-9.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-xhdpi-v4/ic_refresh_white_24dp.png
+9.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/xml/preferences.xml
 13.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-mdpi-v4/ic_done_white_24dp.png
 13.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 11.set=ANDROID_RESOURCE
@@ -35,7 +35,7 @@
 6.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 6.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/xml/device_admin.xml
 10.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
-10.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/xml/preferences.xml
+10.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
 13.set=ANDROID_RESOURCE
 8.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_
 8.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-release.ap_/res/menu/configuration.xml

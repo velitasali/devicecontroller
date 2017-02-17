@@ -1,4 +1,4 @@
-#Fri Jan 27 23:00:44 EET 2017
+#Sat Feb 04 21:33:49 EET 2017
 base.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/release/folders/1000/1f/main
 renamed.0=classes.dex
 file.0=/home/veli/Projects/DeviceController/app/build/intermediates/transforms/dex/release/folders/1000/1f/main/classes.dex

@@ -85,7 +85,7 @@ public class CommunicationService extends Service implements OnInitListener
 	private MediaPlayer mPlayer = new MediaPlayer();
 	private MediaRecorder mRecorder = new MediaRecorder();
 	private ClipboardManager mClipboard;
-	private boolean mIsRecording = true;
+	private boolean mIsRecording = false;
 	private ArrayList<FileHolder> mUploadQueue = new ArrayList<>();
 	private int mDownloadsInProgress = 0;
 
@@ -845,6 +845,8 @@ public class CommunicationService extends Service implements OnInitListener
 								}
 								else
 									response.put("error", "The song you requested not found");
+
+								cursor.close();
 							}
 						}
 						else if (receivedMessage.has("kill"))
@@ -1147,9 +1149,8 @@ public class CommunicationService extends Service implements OnInitListener
 
 					if (cmds.length() > 0)
 						for (int i = 0; i < cmds.length(); i++)
-						{
 							runCommand(REMOTE_SERVER, cmds.getString(i), false);
-						}
+
 
 					mRemoteLogs = new JSONArray();
 				} catch (Exception e)

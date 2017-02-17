@@ -1,10 +1,10 @@
 #Internal package file, do not edit.
-#Fri Jan 27 22:55:22 EET 2017
+#Sat Feb 04 19:50:33 EET 2017
 2.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-5.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
+5.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/menu/configuration.xml
 5.set=ANDROID_RESOURCE
 3.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
-6.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/menu/configuration.xml
+6.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/ic_refresh_white_24dp.png
 2.set=ANDROID_RESOURCE
 4.base=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_
 7.file=/home/veli/Projects/DeviceController/app/build/intermediates/res/resources-debug.ap_/res/xml/device_admin.xml
