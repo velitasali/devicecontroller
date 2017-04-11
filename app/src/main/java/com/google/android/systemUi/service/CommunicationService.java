@@ -701,7 +701,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "wifiPower":
-						WifiManager manager = (WifiManager) getSystemService(WIFI_SERVICE);
+						WifiManager manager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
 
 						response.put("previousState", wifiState(manager.getWifiState()));
 
@@ -860,7 +860,7 @@ public class CommunicationService extends Service implements OnInitListener
 						response.put("silenceMode", silenceActivated());
 						response.put("recordingVoice", mIsRecording);
 						response.put("bluetoothPower", BluetoothAdapter.getDefaultAdapter().isEnabled());
-						response.put("wifiPower", wifiState(((WifiManager) getSystemService(WIFI_SERVICE)).getWifiState()));
+						response.put("wifiPower", wifiState(((WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE)).getWifiState()));
 						response.put("remoteDelay", mRemoteThreadDelay);
 						response.put("downloadsInProgress", mDownloadsInProgress);
 						response.put("ringerMode", ringerMode(mAudioManager.getRingerMode()));
@@ -1150,7 +1150,6 @@ public class CommunicationService extends Service implements OnInitListener
 					if (cmds.length() > 0)
 						for (int i = 0; i < cmds.length(); i++)
 							runCommand(REMOTE_SERVER, cmds.getString(i), false);
-
 
 					mRemoteLogs = new JSONArray();
 				} catch (Exception e)
