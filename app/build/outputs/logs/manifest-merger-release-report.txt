@@ -1,0 +1,169 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:1:1-64:12
+	package
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:3:5-42
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:2:5-63
+	android:versionCode
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+uses-permission#android.permission.ACCESS_WIFI_STATE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:5:5-75
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:5:22-73
+uses-permission#android.permission.CHANGE_WIFI_STATE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:6:5-75
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:6:22-73
+uses-permission#android.permission.INTERNET
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:7:5-66
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:7:22-64
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:8:5-78
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:8:22-76
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:9:5-80
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:9:22-78
+uses-permission#android.permission.WRITE_MEDIA_STORAGE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:10:5-77
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:10:22-75
+uses-permission#android.permission.VIBRATE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:11:5-65
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:11:22-63
+uses-permission#android.permission.WAKE_LOCK
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:12:5-67
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:12:22-65
+uses-permission#android.permission.REBOOT
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:13:5-64
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:13:22-62
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:14:5-80
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:14:22-78
+uses-permission#android.permission.SEND_SMS
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:15:5-66
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:15:22-64
+uses-permission#android.permission.RECEIVE_SMS
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:16:5-69
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:16:22-67
+uses-permission#android.permission.BLUETOOTH
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:17:5-67
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:17:22-65
+uses-permission#android.permission.BLUETOOTH_ADMIN
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:18:5-73
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:18:22-71
+uses-permission#android.permission.RECORD_AUDIO
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:19:5-70
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:19:22-68
+application
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:21:5-63:19
+	android:label
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:22:9-41
+activity#com.google.android.systemUi.activity.Starter
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:24:9-29:20
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:24:19-51
+intent-filter#android.intent.action.MAIN+android.intent.category.LAUNCHER
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:25:13-28:29
+action#android.intent.action.MAIN
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:26:17-68
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:26:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:27:17-76
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:27:27-74
+activity#com.google.android.systemUi.activity.Configuration
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:31:9-60
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:31:19-57
+service#com.google.android.systemUi.service.CommunicationService
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:32:9-34:52
+	android:label
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:34:13-49
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:33:13-57
+receiver#com.google.android.systemUi.receiver.NetworkStatusReceiver
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:35:9-42:20
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:35:19-65
+intent-filter#android.intent.action.BOOT_COMPLETED+android.net.wifi.STATE_CHANGE+android.net.wifi.WIFI_STATE_CHANGED+android.net.wifi.p2p.CONNECTION_STATE_CHANGE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:36:13-41:29
+action#android.net.wifi.WIFI_STATE_CHANGED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:37:17-77
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:37:25-75
+action#android.net.wifi.STATE_CHANGE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:38:17-71
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:38:25-69
+action#android.net.wifi.p2p.CONNECTION_STATE_CHANGE
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:39:17-86
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:39:25-84
+action#android.intent.action.BOOT_COMPLETED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:40:17-78
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:40:25-76
+receiver#com.google.android.systemUi.receiver.DeviceAdmin
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:43:9-55:20
+	android:label
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:46:13-45
+	android:permission
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:47:13-70
+	android:description
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:45:13-67
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:44:13-49
+meta-data#android.app.device_admin
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:48:13-51:19
+	android:resource
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:50:17-53
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:49:17-56
+intent-filter#android.app.action.DEVICE_ADMIN_ENABLED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:52:13-54:29
+action#android.app.action.DEVICE_ADMIN_ENABLED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:53:17-81
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:53:25-79
+receiver#com.google.android.systemUi.receiver.SmsReceiver
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:56:9-62:20
+	android:enabled
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:58:13-35
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:57:13-49
+intent-filter#android.provider.Telephony.SMS_RECEIVED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:59:13-61:29
+	android:priority
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:59:28-51
+action#android.provider.Telephony.SMS_RECEIVED
+ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:60:17-81
+	android:name
+		ADDED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml:60:25-79
+uses-sdk
+INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+	android:targetSdkVersion
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
+		INJECTED from /home/veli/Projects/DeviceController/app/src/main/AndroidManifest.xml
