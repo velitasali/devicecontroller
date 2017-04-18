@@ -1132,7 +1132,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 								response.put("pairedDevices", pairedDevicesList);
 
-								result = false;
+								result = true;
 								break;
 						}
 						break;
@@ -1222,7 +1222,6 @@ public class CommunicationService extends Service implements OnInitListener
 
 						response.put("isLimited", receivedMessage.has("limit") && receivedMessage.getInt("limit") > 0);
 						response.put("msg", messageList);
-
 						break;
 					default:
 						response.put("error", "{" + request + "} is not found");
