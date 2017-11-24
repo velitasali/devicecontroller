@@ -1,11 +1,13 @@
 package com.genonbeta.CoolSocket;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -18,281 +20,420 @@ import java.util.concurrent.TimeoutException;
 
 abstract public class CoolSocket
 {
-    public static final String END_SEQUENCE = "\n();;";
-    public static final int NO_TIMEOUT = -1;
+	public static final int NO_TIMEOUT = -1;
 
-    private Thread mServerThread;
-    private ServerSocket mServerSocket;
-    private SocketAddress mSocketAddress = null;
-    private int mSocketTimeout = NO_TIMEOUT; // no timeout
-    private int mMaxConnections = 0; // no limit
-    private SocketRunnable mSocketRunnable = new SocketRunnable();
-    private ArrayList<ClientHandler> mConnections = new ArrayList<ClientHandler>();
+	public static final String HEADER_SEPARATOR = "\nHEADER_END\n";
+	public static final String HEADER_ITEM_LENGTH = "length";
 
-    public CoolSocket()
-    {
-    }
+	private Thread mServerThread;
+	private ServerSocket mServerSocket;
+	private SocketAddress mSocketAddress = null;
+	private int mSocketTimeout = NO_TIMEOUT; // no timeout
+	private int mMaxConnections = 0; // no limit
+	private ServerRunnable mSocketRunnable = new ServerRunnable();
+	private ArrayList<ActiveConnection> mConnections = new ArrayList<>();
 
-    public CoolSocket(int port)
-    {
-        this.mSocketAddress = new InetSocketAddress(port);
-    }
-
-    public CoolSocket(String address, int port)
-    {
-        this.mSocketAddress = new InetSocketAddress(address, port);
-    }
-
-    public static PrintWriter getStreamWriter(OutputStream outputStream)
-    {
-        return new PrintWriter(new BufferedOutputStream(outputStream));
-    }
-
-    public static ByteArrayOutputStream readStream(InputStream inputStreamIns, int timeout) throws IOException, TimeoutException
+	public CoolSocket()
 	{
-        BufferedInputStream inputStream = new BufferedInputStream(inputStreamIns);
-        ByteArrayOutputStream inputStreamResult = new ByteArrayOutputStream();
+	}
 
-        byte[] buffer = new byte[8096];
-        int len = 0;
-		long calculatedTimeout = timeout != NO_TIMEOUT ? System.currentTimeMillis() + timeout : NO_TIMEOUT;
-
-        do
-        {
-            if ((len = inputStream.read(buffer)) > 0)
-                inputStreamResult.write(buffer, 0, len);
-
-			if (calculatedTimeout != NO_TIMEOUT && System.currentTimeMillis() > calculatedTimeout)
-				throw new TimeoutException("Read timed out!");
-        }
-        while (!inputStreamResult.toString().endsWith(END_SEQUENCE));
-
-        return inputStreamResult;
-    }
-
-    public static String readStreamMessage(InputStream inputStream, int timeout) throws IOException, TimeoutException
+	public CoolSocket(int port)
 	{
-        return readStreamMessage(readStream(inputStream, timeout));
-    }
+		this.mSocketAddress = new InetSocketAddress(port);
+	}
 
-    public static String readStreamMessage(ByteArrayOutputStream outputStream)
-    {
-        String message = outputStream.toString();
+	public CoolSocket(String address, int port)
+	{
+		this.mSocketAddress = new InetSocketAddress(address, port);
+	}
 
-        return message.substring(0, message.length() - END_SEQUENCE.length());
-    }
+	protected abstract void onConnected(ActiveConnection activeConnection);
 
-    protected void onClosingConnection(ClientHandler client)
-    {
-    }
+	public static <T> T connect(final Client.ConnectionHandler handler, Class<T> clazz)
+	{
+		Client clientInstance = new Client();
 
-    abstract protected void onError(Exception exception);
+		handler.onConnect(clientInstance);
 
-    abstract protected void onPacketReceived(Socket socket);
+		return clientInstance.getReturn() != null ? clazz.cast(clientInstance.getReturn()) : null;
+	}
 
-    public ArrayList<ClientHandler> getConnections()
-    {
-        return this.mConnections;
-    }
+	public static void connect(final Client.ConnectionHandler handler)
+	{
+		final Client clientInstance = new Client();
 
-    public int getLocalPort()
-    {
-        return this.getServerSocket().getLocalPort();
-    }
+		new Thread()
+		{
+			@Override
+			public void run()
+			{
+				super.run();
+				handler.onConnect(clientInstance);
+			}
+		}.start();
+	}
 
-    protected ServerSocket getServerSocket()
-    {
-        return this.mServerSocket;
-    }
+	public int getConnectionCountByAddress(InetAddress address)
+	{
+		int returnObject = 0;
 
-    public SocketAddress getSocketAddress()
-    {
-        return this.mSocketAddress;
-    }
+		for (ActiveConnection activeConnection : getConnections())
+			if (activeConnection.getAddress().equals(address))
+				returnObject++;
 
-    public void setSocketAddress(SocketAddress address)
-    {
-        this.mSocketAddress = address;
-    }
+		return returnObject;
+	}
 
-    protected SocketRunnable getSocketRunnable()
-    {
-        return this.mSocketRunnable;
-    }
+	public synchronized ArrayList<ActiveConnection> getConnections()
+	{
+		return this.mConnections;
+	}
+
+	public int getLocalPort()
+	{
+		return this.getServerSocket().getLocalPort();
+	}
+
+	protected ServerSocket getServerSocket()
+	{
+		return this.mServerSocket;
+	}
+
+	protected Thread getServerThread()
+	{
+		return this.mServerThread;
+	}
+
+	public SocketAddress getSocketAddress()
+	{
+		return this.mSocketAddress;
+	}
+
+	protected ServerRunnable getSocketRunnable()
+	{
+		return this.mSocketRunnable;
+	}
 
 	public int getSocketTimeout()
 	{
 		return this.mSocketTimeout;
 	}
 
-    protected Thread getServerThread()
-    {
-        return this.mServerThread;
-    }
+	public boolean isComponentsReady()
+	{
+		return this.getServerSocket() != null && this.getServerThread() != null && this.getSocketAddress() != null;
+	}
 
-    public boolean isComponentsReady()
-    {
-        return this.getServerSocket() != null && this.getServerThread() != null && this.getSocketAddress() != null;
-    }
+	public boolean isInterrupted()
+	{
+		return this.getServerThread().isInterrupted();
+	}
 
-    public boolean isInterrupted()
-    {
-        return this.getServerThread().isInterrupted();
-    }
+	public boolean isServerAlive()
+	{
+		return this.getServerThread().isAlive();
+	}
 
-    public boolean isServerAlive()
-    {
-        return this.getServerThread().isAlive();
-    }
+	protected boolean respondRequest(final Socket socket)
+	{
+		if (this.getConnections().size() <= this.mMaxConnections || this.mMaxConnections == 0) {
+			final ActiveConnection connectionHandler = new ActiveConnection(socket);
 
-    protected boolean respondRequest(Socket socket)
-    {
-        if (this.getConnections().size() < this.mMaxConnections || this.mMaxConnections == 0)
-        {
-            ClientHandler clientRunnable = new ClientHandler(socket);
-            Thread selfThread = new Thread(clientRunnable);
+			CoolSocket.this.getConnections().add(connectionHandler);
 
-            this.getConnections().add(clientRunnable);
+			new Thread()
+			{
+				@Override
+				public void run()
+				{
+					try {
+						if (CoolSocket.this.mSocketTimeout > NO_TIMEOUT)
+							connectionHandler.getSocket().setSoTimeout(CoolSocket.this.mSocketTimeout);
+					} catch (SocketException e) {
+						e.printStackTrace();
+					}
 
-            selfThread.start();
-        }
-        else
-            return false;
+					onConnected(connectionHandler);
 
-        return true;
-    }
+					try {
+						socket.getInputStream().close();
+						socket.getOutputStream().close();
+						socket.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						CoolSocket.this.getConnections().remove(connectionHandler);
+					}
+				}
+			}.start();
+		} else
+			return false;
 
-    public void setMaxConnections(int value)
-    {
-        this.mMaxConnections = value;
-    }
+		return true;
+	}
 
-    public void setSocketTimeout(int timeout)
-    {
-        this.mSocketTimeout = timeout;
-    }
+	public void setMaxConnections(int value)
+	{
+		this.mMaxConnections = value;
+	}
 
-    public boolean start()
-    {
-        if (this.getServerSocket() == null || this.getServerSocket().isClosed())
-        {
-            try
-            {
-                this.mServerSocket = new ServerSocket();
-                this.getServerSocket().bind(this.mSocketAddress);
-            } catch (IOException e)
-            {
-                e.printStackTrace();
-                return false;
-            }
-        }
+	public void setSocketAddress(SocketAddress address)
+	{
+		this.mSocketAddress = address;
+	}
 
-        if (this.getServerThread() == null || Thread.State.TERMINATED.equals(this.getServerThread().getState()))
-        {
-            this.mServerThread = new Thread(this.getSocketRunnable());
+	public void setSocketTimeout(int timeout)
+	{
+		this.mSocketTimeout = timeout;
+	}
 
-            this.getServerThread().setDaemon(true);
-            this.getServerThread().setName("CoolSocket Main Thread");
-        }
-        else if (this.getServerThread().isAlive())
-            return false;
+	public boolean start()
+	{
+		if (this.getServerSocket() == null || this.getServerSocket().isClosed()) {
+			try {
+				this.mServerSocket = new ServerSocket();
+				this.getServerSocket().bind(this.mSocketAddress);
+			} catch (IOException e) {
+				e.printStackTrace();
+				return false;
+			}
+		}
 
-        this.getServerThread().start();
+		if (this.getServerThread() == null || Thread.State.TERMINATED.equals(this.getServerThread().getState())) {
+			this.mServerThread = new Thread(this.getSocketRunnable());
 
-        return true;
-    }
+			this.getServerThread().setDaemon(true);
+			this.getServerThread().setName("CoolSocket Main Thread");
+		} else if (this.getServerThread().isAlive())
+			return false;
 
-    public boolean startDelayed(int timeout)
-    {
-        long startTime = System.currentTimeMillis();
+		this.getServerThread().start();
 
-        while (this.isServerAlive() && (System.currentTimeMillis() - startTime) < timeout)
-        {
-        }
+		return true;
+	}
 
-        return this.start();
-    }
+	public boolean startDelayed(int timeout)
+	{
+		long startTime = System.currentTimeMillis();
 
-    public boolean stop()
-    {
-        if (this.isInterrupted())
-            return false;
+		while (this.isServerAlive() && (System.currentTimeMillis() - startTime) < timeout) {
+		}
 
-        this.getServerThread().interrupt();
+		return this.start();
+	}
 
-        if (!this.getServerSocket().isClosed())
-        {
-            try
-            {
-                this.getServerSocket().close();
-            } catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-        }
+	public boolean stop()
+	{
+		if (this.isInterrupted())
+			return false;
 
-        return true;
-    }
+		this.getServerThread().interrupt();
 
-    protected class ClientHandler implements Runnable
-    {
-        private Socket mSocket;
+		if (!this.getServerSocket().isClosed()) {
+			try {
+				this.getServerSocket().close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 
-        public ClientHandler(Socket socket)
-        {
-            this.mSocket = socket;
-        }
+		return true;
+	}
 
-        public InetAddress getAddress()
-        {
-            return this.getSocket().getInetAddress();
-        }
+	public void onInternalError(Exception exception)
+	{
+	}
 
-        public Socket getSocket()
-        {
-            return this.mSocket;
-        }
+	public static class ActiveConnection
+	{
+		private Socket mSocket;
+		private int mTimeout = NO_TIMEOUT;
 
-        @Override
-        public void run()
-        {
-            try
-            {
-                if (CoolSocket.this.mSocketTimeout > NO_TIMEOUT)
-                    this.mSocket.setSoTimeout(CoolSocket.this.mSocketTimeout);
-            } catch (SocketException e)
-            {
-                e.printStackTrace();
-            }
+		public ActiveConnection(Socket socket)
+		{
+			this.mSocket = socket;
+		}
 
-            CoolSocket.this.onPacketReceived(this.mSocket);
+		public ActiveConnection(Socket socket, int timeout)
+		{
+			this(socket);
+			setTimeout(timeout);
+		}
 
-            CoolSocket.this.onClosingConnection(this);
-            CoolSocket.this.getConnections().remove(this);
-        }
-    }
+		public InetAddress getAddress()
+		{
+			return this.getSocket().getInetAddress();
+		}
 
-    private class SocketRunnable implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            try
-            {
-                do
-                {
-                    Socket request = CoolSocket.this.getServerSocket().accept();
+		public String getClientAddress()
+		{
+			return this.getAddress().getHostAddress();
+		}
 
-                    if (CoolSocket.this.isInterrupted())
-                        request.close();
-                    else
-                        respondRequest(request);
-                }
-                while (!CoolSocket.this.isInterrupted());
-            } catch (IOException e)
-            {
-                CoolSocket.this.onError(e);
-            }
-        }
-    }
+		public Socket getSocket()
+		{
+			return this.mSocket;
+		}
+
+		public long getTimeout()
+		{
+			return mTimeout;
+		}
+
+		@Override
+		public boolean equals(Object obj)
+		{
+			return obj instanceof ActiveConnection ? ((ActiveConnection) obj).toString().equals(toString()) : super.equals(obj);
+		}
+
+		public Response receive() throws IOException, TimeoutException, JSONException
+		{
+			byte[] buffer = new byte[8096];
+			int len;
+			long calculatedTimeout = getTimeout() != NO_TIMEOUT ? System.currentTimeMillis() + getTimeout() : NO_TIMEOUT;
+
+			InputStream inputStream = getSocket().getInputStream();
+			ByteArrayOutputStream headerIndex = new ByteArrayOutputStream();
+			ByteArrayOutputStream receivedMessage = new ByteArrayOutputStream();
+
+			Response response = new Response();
+			response.remoteAddress = getSocket().getRemoteSocketAddress();
+
+			do {
+				if ((len = inputStream.read(buffer)) > 0) {
+					if (response.totalLength > 0) {
+						receivedMessage.write(buffer, 0, len);
+						receivedMessage.flush();
+					} else {
+						headerIndex.write(buffer, 0, len);
+						headerIndex.flush();
+
+						if (headerIndex.toString().contains(HEADER_SEPARATOR)) {
+							String headerString = headerIndex.toString();
+							int headerEndPoint = headerString.indexOf(HEADER_SEPARATOR);
+
+							JSONObject headerJSON = new JSONObject(headerString.substring(0, headerEndPoint));
+							response.totalLength = headerJSON.getLong(HEADER_ITEM_LENGTH);
+							response.headerIndex = headerJSON;
+
+							if (headerEndPoint < headerIndex.size())
+								receivedMessage.write(headerString.substring(headerEndPoint + (HEADER_SEPARATOR.length())).getBytes());
+						}
+					}
+				}
+
+				if (calculatedTimeout != NO_TIMEOUT && System.currentTimeMillis() > calculatedTimeout)
+					throw new TimeoutException("Read timed out!");
+			}
+			while (response.totalLength != receivedMessage.size() && response.totalLength != 0);
+
+			response.response = receivedMessage.toString();
+
+			return response;
+		}
+
+		public void reply(String out) throws TimeoutException, IOException, JSONException
+		{
+			byte[] outputBytes = out == null ? new byte[0] : out.getBytes();
+
+			ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+			PrintWriter outputWriter = new PrintWriter(outputStream);
+
+			JSONObject headerJSON = new JSONObject()
+					.put(HEADER_ITEM_LENGTH, outputBytes.length);
+
+			outputWriter.write(headerJSON.toString() + HEADER_SEPARATOR);
+			outputWriter.flush();
+
+			byte[] buffer = new byte[8096];
+			int len;
+			long calculatedTimeout = getTimeout() != NO_TIMEOUT ? System.currentTimeMillis() + getTimeout() : NO_TIMEOUT;
+
+			ByteArrayInputStream inputStream = new ByteArrayInputStream(outputBytes);
+			DataOutputStream remoteOutputStream = new DataOutputStream(getSocket().getOutputStream());
+
+			remoteOutputStream.write(outputStream.toByteArray());
+			remoteOutputStream.flush();
+
+			do {
+				if ((len = inputStream.read(buffer)) > 0)
+					remoteOutputStream.write(buffer, 0, len);
+
+				if (calculatedTimeout != NO_TIMEOUT && System.currentTimeMillis() > calculatedTimeout)
+					throw new TimeoutException("Read timed out!");
+			}
+			while (len != -1);
+		}
+
+		public void setTimeout(int timeout)
+		{
+			this.mTimeout = timeout;
+		}
+
+		public class Response
+		{
+			public SocketAddress remoteAddress;
+			public JSONObject headerIndex;
+			public String response;
+			public long totalLength;
+
+			public Response()
+			{
+			}
+		}
+	}
+
+	private class ServerRunnable implements Runnable
+	{
+		@Override
+		public void run()
+		{
+			try {
+				do {
+					Socket request = CoolSocket.this.getServerSocket().accept();
+
+					if (CoolSocket.this.isInterrupted())
+						request.close();
+					else
+						respondRequest(request);
+				}
+				while (!CoolSocket.this.isInterrupted());
+			} catch (IOException e) {
+				CoolSocket.this.onInternalError(e);
+			}
+		}
+	}
+
+	public static class Client
+	{
+		private Object mReturn;
+
+		public ActiveConnection connect(SocketAddress socketAddress, int operationTimeout) throws IOException
+		{
+			Socket socket = new Socket();
+
+			if (operationTimeout != NO_TIMEOUT)
+				socket.setSoTimeout(operationTimeout);
+
+			socket.bind(null);
+			socket.connect(socketAddress);
+
+			return new ActiveConnection(socket, operationTimeout);
+		}
+
+		public interface ConnectionHandler
+		{
+			void onConnect(Client client);
+		}
+
+		public Object getReturn()
+		{
+			return mReturn;
+		}
+
+		public void setReturn(Object returnedObject)
+		{
+			this.mReturn = returnedObject;
+		}
+	}
 }

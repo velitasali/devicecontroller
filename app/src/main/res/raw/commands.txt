@@ -22,7 +22,6 @@
 {"request":"tts","message":"hi","language":"en_GB"}
 {"request":"ttsExit"}
 {"request":"getGrantedList"}
-{"request":"toggleTabs"}
 {"request":"setDeviceName","name":""}
 {"request":"notifyRequests"}
 {"request":"send","server":"","port":3000,"message":""}
